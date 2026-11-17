@@ -10,6 +10,7 @@ using System.Text.Json;
 
 namespace JQuery_ECommerceAss.Controllers
 {
+    [AutoValidateAntiforgeryToken]
     public class SellerController : Controller
     {
         private readonly AppDbContext db;
@@ -234,6 +235,7 @@ namespace JQuery_ECommerceAss.Controllers
             {
                 HttpContext.Session.Remove("OTP");
                 HttpContext.Session.Remove("OTPType");
+                HttpContext.Session.SetString("PasswordResetVerifiedAt", DateTime.UtcNow.ToString("O"));
                 return Json(new { success = true, redirect = "/Seller/ChangePassword" });
             }
 
@@ -249,6 +251,7 @@ namespace JQuery_ECommerceAss.Controllers
         [HttpPost]
         public IActionResult ForgotPassword(string email)
         {
+            HttpContext.Session.Remove("PasswordResetVerifiedAt");
             var getSeller = db.Sellers.FirstOrDefault(s => s.SellerEmail == email);
             if (getSeller == null)
             {
@@ -276,7 +279,7 @@ namespace JQuery_ECommerceAss.Controllers
         // ==================== CHANGE PASSWORD (AJAX) ====================
         public IActionResult ChangePassword()
         {
-            if (string.IsNullOrEmpty(HttpContext.Session.GetString("Email")))
+            if (!IsPasswordResetVerified())
             {
                 return RedirectToAction(nameof(ForgotPassword));
             }
@@ -291,13 +294,12 @@ namespace JQuery_ECommerceAss.Controllers
                 return Json(new { success = false, message = "Passwords do not match" });
             }
 
-            var email = HttpContext.Session.GetString("Email");
-
-            if (string.IsNullOrEmpty(email))
+            if (!IsPasswordResetVerified())
             {
                 return Json(new { success = false, message = "Session expired" });
             }
 
+            var email = HttpContext.Session.GetString("Email");
             var getSeller = db.Sellers.FirstOrDefault(s => s.SellerEmail == email);
 
             if (getSeller == null)
@@ -309,6 +311,7 @@ namespace JQuery_ECommerceAss.Controllers
             db.SaveChanges();
 
             HttpContext.Session.Remove("Email");
+            HttpContext.Session.Remove("PasswordResetVerifiedAt");
 
             return Json(new { success = true, message = "Password changed successfully!" });
         }
@@ -386,10 +389,16 @@ namespace JQuery_ECommerceAss.Controllers
 
             if (Image != null && Image.Length > 0)
             {
+                if (!FileUploadSecurity.IsSafeImage(Image))
+                {
+                    TempData["Error"] = "Only valid JPG, PNG, or WEBP images up to 5 MB are allowed.";
+                    return RedirectToAction(nameof(AddProduct));
+                }
+
                 string uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "images", "products");
                 Directory.CreateDirectory(uploadsFolder);
 
-                string uniqueFileName = Guid.NewGuid().ToString() + "_" + Image.FileName;
+                string uniqueFileName = FileUploadSecurity.CreateSafeFileName(Image);
                 string filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
                 using (var fileStream = new FileStream(filePath, FileMode.Create))
@@ -456,6 +465,12 @@ namespace JQuery_ECommerceAss.Controllers
 
             if (Image != null && Image.Length > 0)
             {
+                if (!FileUploadSecurity.IsSafeImage(Image))
+                {
+                    TempData["Error"] = "Only valid JPG, PNG, or WEBP images up to 5 MB are allowed.";
+                    return RedirectToAction(nameof(ManageProducts));
+                }
+
                 if (!string.IsNullOrEmpty(existingProduct.ImagePath))
                 {
                     string oldImagePath = Path.Combine(_webHostEnvironment.WebRootPath, existingProduct.ImagePath.TrimStart('/'));
@@ -468,7 +483,7 @@ namespace JQuery_ECommerceAss.Controllers
                 string uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "images", "products");
                 Directory.CreateDirectory(uploadsFolder);
 
-                string uniqueFileName = Guid.NewGuid().ToString() + "_" + Image.FileName;
+                string uniqueFileName = FileUploadSecurity.CreateSafeFileName(Image);
                 string filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
                 using (var fileStream = new FileStream(filePath, FileMode.Create))
@@ -722,10 +737,15 @@ namespace JQuery_ECommerceAss.Controllers
 
                 if (Image != null && Image.Length > 0)
                 {
+                    if (!FileUploadSecurity.IsSafeImage(Image))
+                    {
+                        return Json(new { success = false, message = "Only valid JPG, PNG, or WEBP images up to 5 MB are allowed." });
+                    }
+
                     string uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "images", "products");
                     Directory.CreateDirectory(uploadsFolder);
 
-                    string uniqueFileName = Guid.NewGuid().ToString() + "_" + Image.FileName;
+                    string uniqueFileName = FileUploadSecurity.CreateSafeFileName(Image);
                     string filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
                     using (var fileStream = new FileStream(filePath, FileMode.Create))
@@ -775,6 +795,11 @@ namespace JQuery_ECommerceAss.Controllers
 
                 if (Image != null && Image.Length > 0)
                 {
+                    if (!FileUploadSecurity.IsSafeImage(Image))
+                    {
+                        return Json(new { success = false, message = "Only valid JPG, PNG, or WEBP images up to 5 MB are allowed." });
+                    }
+
                     if (!string.IsNullOrEmpty(existingProduct.ImagePath))
                     {
                         string oldImagePath = Path.Combine(_webHostEnvironment.WebRootPath, existingProduct.ImagePath.TrimStart('/'));
@@ -787,7 +812,7 @@ namespace JQuery_ECommerceAss.Controllers
                     string uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "images", "products");
                     Directory.CreateDirectory(uploadsFolder);
 
-                    string uniqueFileName = Guid.NewGuid().ToString() + "_" + Image.FileName;
+                    string uniqueFileName = FileUploadSecurity.CreateSafeFileName(Image);
                     string filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
                     using (var fileStream = new FileStream(filePath, FileMode.Create))
@@ -918,7 +943,23 @@ namespace JQuery_ECommerceAss.Controllers
         private bool IsSellerLoggedIn()
         {
             var sellerId = HttpContext.Session.GetString("LoginSeller");
-            return !string.IsNullOrEmpty(sellerId);
+            return int.TryParse(sellerId, out var id) &&
+                   db.Sellers.Any(s => s.SellerID == id &&
+                       (s.SellerStatus == Status.Active || s.SellerStatus == Status.Approve));
+        }
+
+        private bool IsPasswordResetVerified()
+        {
+            var email = HttpContext.Session.GetString("Email");
+            var verifiedAt = HttpContext.Session.GetString("PasswordResetVerifiedAt");
+
+            return !string.IsNullOrEmpty(email) &&
+                   DateTime.TryParse(
+                       verifiedAt,
+                       null,
+                       System.Globalization.DateTimeStyles.RoundtripKind,
+                       out var timestamp) &&
+                   DateTime.UtcNow - timestamp <= TimeSpan.FromMinutes(10);
         }
 
         private void SendByGmail(string receiver, string body)

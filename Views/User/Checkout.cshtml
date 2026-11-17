@@ -146,10 +146,11 @@
                     <div class="card-body">
                         <h5 class="fw-bold mb-3">Payment Information</h5>
                         <form id="paymentForm" asp-action="ProcessPayment" method="post">
-                            <input type="hidden" name="subtotal" value="@subtotal">
-                            <input type="hidden" name="gst" value="@gst">
-                            <input type="hidden" name="promotion" value="@promoDiscount">
-                            <input type="hidden" name="promoCode" value="@appliedPromoCode">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="checkoutToken" value="@ViewBag.CheckoutToken">
+                            <div class="alert alert-info">
+                                Your total is recalculated securely on the server when payment is submitted.
+                            </div>
 
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Card Number</label>

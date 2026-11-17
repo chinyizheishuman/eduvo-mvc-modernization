@@ -196,9 +196,6 @@ namespace JQuery_ECommerceAss.Migrations
                     b.Property<decimal?>("Amount")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<string>("CardNumber")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime?>("DateTime")
                         .HasColumnType("datetime2");
 

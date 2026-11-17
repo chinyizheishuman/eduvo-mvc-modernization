@@ -374,3 +374,193 @@ dotnet build JQuery-ECommerceAss.csproj --no-restore
 Do not run the application or apply migrations until the SQL Server configuration,
 SMTP configuration, authentication design, and checkout integrity work have been
 reviewed.
+
+## Handoff
+
+The latest existing commit message was verified without a
+`Co-authored-by: Copilot` trailer. This README handoff note is an uncommitted
+documentation update. No history rewrite is required.
+
+## Current deep review
+
+Review date: 2026-11-17. This section records the latest read-only review after
+the modernization commit. The project builds cleanly, but build success does not
+prove that authentication, authorization, money, inventory, or file handling are
+safe at runtime.
+
+### Critical findings still open
+
+| Priority | Evidence | What is wrong | Why it matters | Required fix |
+|---|---|---|---|---|
+| Critical | `Controllers/UserController.cs` reset flow around lines 350-403; `Controllers/SellerController.cs` around lines 248-308 | Password reset stores the requested email in session before OTP verification. The change-password action authorizes using that email without requiring an OTP-success marker. | An attacker can request a reset for another account and set a new password without knowing the OTP. | Use a single-use, short-lived, server-side reset token created only after verified OTP, or store the email only after successful OTP verification. |
+| Critical | `Controllers/UserController.cs` `ProcessPayment` around lines 628-728; `Views/User/Checkout.cshtml` payment form | `subtotal`, `gst`, and `promotion` are accepted from hidden browser fields and used in transaction amounts, seller allocation, and email totals. | An authenticated shopper can alter totals and create falsified financial records. No trusted payment verification exists. | Recalculate all totals from current database prices, quantities, and validated promotion state. Add a trusted payment provider and atomic order commit. |
+
+### High and medium findings still open
+
+| Severity | Evidence | Finding | Why it matters | Required fix |
+|---|---|---|---|---|
+| High | `Controllers/UserController.cs` diagnostic promotion actions around lines 862-1052 | Public actions can inspect another user, assign promotions, and create test promotions. | Unauthenticated users can read or mutate business data. | Remove diagnostic actions or restrict them to development and administrator authorization with antiforgery protection. |
+| High | `Controllers/SellerController.cs` product upload actions around lines 375-400 and 776-800; `Controllers/AdminController.cs` upload actions around lines 709-804 | Uploads accept arbitrary file content into the public `wwwroot` tree. Client-side `accept="image/*"` is not server validation. | HTML, SVG, or script content can become publicly served under the application origin. | Validate size, extension, MIME, and file signature. Generate controlled names and store files outside the public tree or serve through a constrained image endpoint. |
+| Medium | `Controllers/SellerController.cs` privileged actions around lines 815-920 | Seller checks only that a login session exists. A seller suspended after login can retain access until session expiry. | Account suspension is not enforced consistently. | Resolve the seller on each privileged request, require active or approved status, and clear sessions after suspension. |
+
+### Remediation status
+
+| Area | Status |
+|---|---|
+| Hardcoded SMTP credentials | Fixed in the committed baseline |
+| New password hashing | Implemented with PBKDF2-SHA256 |
+| Legacy password transition | Temporary compatibility remains; upgrade occurs after successful login |
+| Card-number persistence in current model and checkout code | Removed |
+| Historical card-number migration column | Still present and requires a future migration |
+| Password reset OTP authorization | Still open |
+| Server-side checkout totals | Still open |
+| Checkout transaction and idempotency | Still open |
+| Diagnostic promotion access control | Still open |
+| Upload validation | Still open |
+| Framework authorization and antiforgery coverage | Still open |
+
+### Why the clean build is not enough
+
+The compiler verifies syntax, types, Razor compilation, and package resolution.
+It cannot verify that a browser has not changed a hidden price field, that an OTP
+was actually checked before a password reset, that two checkout requests cannot
+spend the same stock, or that an uploaded file is safe to serve. These are
+runtime security and business-integrity properties and require focused tests and
+design changes.
+
+### Latest verification
+
+The following read-only checks were run after the deep review:
+
+```text
+dotnet build JQuery-ECommerceAss.csproj
+Build succeeded. 0 Warning(s), 0 Error(s)
+
+dotnet list JQuery-ECommerceAss.csproj package --vulnerable --include-transitive
+The given project JQuery-ECommerceAss has no vulnerable packages given the current sources.
+```
+
+The application was not run. No database or external service was contacted. The
+latest commit remains the user's commit, and the README changes in this section
+remain uncommitted until explicitly reviewed.
+
+The current worktree also shows generated `bin/` and `obj/` files as modified
+because those directories are tracked by the existing commit. This is a source
+hygiene problem: builds should generate ignored artifacts, not modify tracked
+dependencies, binaries, symbols, and intermediate files. Remove them from
+version control in a separate, explicitly reviewed cleanup commit. Do not mix
+that cleanup with application security changes.
+
+## Latest implementation update
+
+The two highest-impact open flaws from the deep review were implemented after
+the review.
+
+### Password reset now requires verified OTP
+
+User and seller reset flows now set a short-lived verification timestamp only
+after the OTP is accepted. Both the reset page and the password-change POST
+require that timestamp and the reset email. The timestamp expires after ten
+minutes and is removed after a successful password change.
+
+This closes the previous session-only authorization gap. Knowing or setting an
+email session value is no longer sufficient to change a password.
+
+### Checkout totals are now server-authoritative
+
+The checkout POST still accepts the historical form signature for compatibility,
+but it no longer trusts submitted subtotal, GST, promotion, or promo-code values.
+It now:
+
+1. Reloads each product from the database.
+2. Rejects missing products, missing sellers, invalid quantities, and insufficient
+   stock.
+3. Uses current database product prices for the subtotal.
+4. Calculates GST on the server.
+5. Reloads the selected promotion for the logged-in user.
+6. Revalidates promotion status, dates, usage state, and minimum purchase.
+7. Applies the promotion cap on the server.
+8. Allocates seller totals from authoritative values.
+9. Uses authoritative totals for transaction records and email totals.
+10. Removes browser-controlled total fields from the checkout form and tells the
+    user that totals are recalculated securely.
+
+This is a meaningful full-stack improvement because the browser is now a display
+client, not the authority for money or discount values.
+
+Verification after this update:
+
+```text
+dotnet build JQuery-ECommerceAss.csproj
+Build succeeded. 0 Warning(s), 0 Error(s)
+```
+
+The application and database were not run. These changes remain uncommitted.
+
+## Comprehensive hardening update
+
+The follow-up hardening pass addressed the remaining reported application
+security issues without rewriting the recovered coursework:
+
+- Diagnostic promotion endpoints are marked non-actionable and are no longer
+  reachable as MVC routes.
+- Seller session checks now verify the seller still exists and is active or
+  approved, so a suspended seller cannot continue using seller workflows.
+- Seller and administrator product uploads now require a JPG, JPEG, PNG, or
+  WEBP signature and a maximum size of 5 MB. Stored filenames are generated
+  server-side and never include the client filename.
+- MVC controllers now use automatic antiforgery validation for state-changing
+  requests. The checkout form includes its antiforgery token explicitly.
+- Checkout now uses a short-lived server-issued request token, an explicit
+  EF Core database transaction, and commits database changes before sending
+  confirmation email. Submitted money values remain ignored.
+- A new migration removes the historical `CardNumber` column from deployed
+  databases. The original migration remains unchanged to preserve provenance.
+
+The checkout token reduces replay of a completed checkout from the same session.
+The next production-grade step would be a persisted order aggregate with a
+database uniqueness constraint and concurrency token for multi-instance,
+concurrent checkout requests. The application still uses custom session
+authorization rather than ASP.NET Core Identity, which remains a modernization
+option rather than a claim about the original coursework.
+
+Verification:
+
+```text
+dotnet build JQuery-ECommerceAss.csproj
+Build succeeded. 0 Warning(s), 0 Error(s)
+
+git -c core.whitespace=cr-at-eol diff --check
+Passed
+```
+
+The application was not run and no database or external service was contacted.
+No commit was created.
+
+## Commit readiness
+
+The modernization is ready for a source commit when the following source-only
+files are explicitly staged:
+
+- Controllers and views
+- Password and upload security helpers
+- The card-number cleanup migration
+- EF Core migration snapshot
+- README and `.gitignore`
+
+Generated `bin/` and `obj/` artifacts should not be included. They are build
+outputs, are already present in this repository from historical coursework,
+and remain separately tracked until an explicit repository-hygiene commit
+removes them from Git index control.
+
+The verified source state is:
+
+- `dotnet build JQuery-ECommerceAss.csproj`: 0 warnings, 0 errors
+- Password resets require verified OTP state
+- Checkout totals are recalculated on the server
+- Checkout uses a session request token and EF Core transaction
+- Diagnostic promotion routes are non-actionable
+- Upload signatures and sizes are validated
+- Suspended sellers cannot retain seller session access
+- Antiforgery validation is enabled for MVC controllers
+- The historical card column has a cleanup migration

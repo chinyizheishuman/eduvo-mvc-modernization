@@ -10,6 +10,7 @@ using System.Text.Json;
 
 namespace JQuery_ECommerceAss.Controllers
 {
+    [AutoValidateAntiforgeryToken]
     public class UserController : Controller
     {
         private readonly AppDbContext db;
@@ -326,6 +327,7 @@ namespace JQuery_ECommerceAss.Controllers
             {
                 HttpContext.Session.Remove("OTP");
                 HttpContext.Session.Remove("OTPType");
+                HttpContext.Session.SetString("PasswordResetVerifiedAt", DateTime.UtcNow.ToString("O"));
                 return Json(new { success = true, redirect = "/User/ChangePassword" });
             }
 
@@ -341,6 +343,7 @@ namespace JQuery_ECommerceAss.Controllers
         [HttpPost]
         public IActionResult ForgotPassword(string email)
         {
+            HttpContext.Session.Remove("PasswordResetVerifiedAt");
             var getUser = db.Users.FirstOrDefault(c => c.UserGmail == email);
             if (getUser == null)
             {
@@ -368,7 +371,7 @@ namespace JQuery_ECommerceAss.Controllers
         // ==================== CHANGE PASSWORD (AJAX) ====================
         public IActionResult ChangePassword()
         {
-            if (string.IsNullOrEmpty(HttpContext.Session.GetString("Email")))
+            if (!IsPasswordResetVerified())
             {
                 return RedirectToAction(nameof(ForgotPassword));
             }
@@ -383,13 +386,12 @@ namespace JQuery_ECommerceAss.Controllers
                 return Json(new { success = false, message = "Passwords do not match" });
             }
 
-            var email = HttpContext.Session.GetString("Email");
-
-            if (string.IsNullOrEmpty(email))
+            if (!IsPasswordResetVerified())
             {
                 return Json(new { success = false, message = "Session expired" });
             }
 
+            var email = HttpContext.Session.GetString("Email");
             var getUser = db.Users.FirstOrDefault(c => c.UserGmail == email);
 
             if (getUser == null)
@@ -401,6 +403,7 @@ namespace JQuery_ECommerceAss.Controllers
             db.SaveChanges();
 
             HttpContext.Session.Remove("Email");
+            HttpContext.Session.Remove("PasswordResetVerifiedAt");
 
             return Json(new { success = true, message = "Password changed successfully!" });
         }
@@ -619,17 +622,28 @@ namespace JQuery_ECommerceAss.Controllers
 
             ViewBag.AppliedPromoCode = promoCode;
             ViewBag.PromotionDiscount = promoDiscount;
+            var checkoutToken = Guid.NewGuid().ToString("N");
+            HttpContext.Session.SetString("CheckoutToken", checkoutToken);
+            ViewBag.CheckoutToken = checkoutToken;
 
             return View(cartItems);
         }
 
         // ==================== PROCESS PAYMENT ====================
         [HttpPost]
-        public IActionResult ProcessPayment(string cardNumber, decimal subtotal, decimal gst, decimal promotion, string promoCode)
+        public IActionResult ProcessPayment(string cardNumber, decimal subtotal, decimal gst, decimal promotion, string promoCode, string checkoutToken)
         {
             if (!IsUserLoggedIn())
             {
                 return RedirectToAction(nameof(Login));
+            }
+
+            var expectedCheckoutToken = HttpContext.Session.GetString("CheckoutToken");
+            if (string.IsNullOrEmpty(expectedCheckoutToken) ||
+                !string.Equals(expectedCheckoutToken, checkoutToken, StringComparison.Ordinal))
+            {
+                TempData["Error"] = "This checkout request has expired. Please reload checkout and try again.";
+                return RedirectToAction(nameof(Checkout));
             }
 
             var userId = Convert.ToInt32(HttpContext.Session.GetString("LoginUser"));
@@ -644,34 +658,61 @@ namespace JQuery_ECommerceAss.Controllers
                 return RedirectToAction(nameof(Cart));
             }
 
+            var products = new List<Product>();
             foreach (var item in cartItems)
             {
                 var product = db.Products.Find(item.ProductID);
-                if (product != null)
+                if (product == null || product.SellerID == null)
                 {
-                    if (product.Quantity < item.Quantity)
-                    {
-                        TempData["Error"] = $"Insufficient stock for {product.ProductName}";
-                        return RedirectToAction(nameof(Cart));
-                    }
-
-                    product.Quantity -= (int)(item.Quantity ?? 0);
+                    TempData["Error"] = "A product in your cart is no longer available.";
+                    return RedirectToAction(nameof(Cart));
                 }
+
+                if (item.Quantity is null or <= 0 || product.Quantity < item.Quantity)
+                {
+                    TempData["Error"] = $"Insufficient stock for {product.ProductName}";
+                    return RedirectToAction(nameof(Cart));
+                }
+
+                item.Price = product.UnitPrice;
+                products.Add(product);
             }
 
+            var authoritativeSubtotal = cartItems.Sum(c => (c.Price ?? 0) * (c.Quantity ?? 0));
+            var authoritativeGst = authoritativeSubtotal * 0.06m;
+            var authoritativePromotion = 0m;
             var userPromotionId = HttpContext.Session.GetInt32("UserPromotionID");
+            UserPromotion? userPromotion = null;
 
             if (userPromotionId.HasValue)
             {
-                var userPromotion = db.UserPromotions.Find(userPromotionId.Value);
-                if (userPromotion != null)
+                userPromotion = db.UserPromotions
+                    .Include(up => up.Promotion)
+                    .FirstOrDefault(up => up.UserPromotionID == userPromotionId.Value && up.UserID == userId);
+
+                var now = DateTime.Now;
+                var promo = userPromotion?.Promotion;
+                if (userPromotion != null &&
+                    promo != null &&
+                    !userPromotion.IsUsed &&
+                    promo.PromotionStatus == Status.Active &&
+                    promo.StartDate <= now &&
+                    (promo.EndDate == null || promo.EndDate >= now) &&
+                    (!promo.MinPurchaseAmount.HasValue || authoritativeSubtotal >= promo.MinPurchaseAmount.Value))
                 {
-                    userPromotion.IsUsed = true;
-                    userPromotion.UsedDate = DateTime.Now;
-                    userPromotion.UsedCount = (userPromotion.UsedCount ?? 0) + 1;
+                    authoritativePromotion = authoritativeSubtotal * (promo.DiscountPercentage / 100);
+                    if (promo.MaxDiscountAmount is > 0 && authoritativePromotion > promo.MaxDiscountAmount.Value)
+                    {
+                        authoritativePromotion = promo.MaxDiscountAmount.Value;
+                    }
+                }
+                else
+                {
+                    userPromotion = null;
                 }
             }
 
+            using var transactionScope = db.Database.BeginTransaction();
             var sellerGroups = cartItems
                 .Where(c => c.Product?.SellerID != null)
                 .GroupBy(c => c.Product!.SellerID!.Value);
@@ -681,9 +722,12 @@ namespace JQuery_ECommerceAss.Controllers
                 var sellerItems = sellerGroup.ToList();
                 var sellerSubtotal = sellerItems.Sum(c => (c.Price ?? 0) * (c.Quantity ?? 0));
 
-                // 按比例计算这个 Seller 的 GST 和 Promotion
-                var sellerGst = (sellerSubtotal / subtotal) * gst;
-                var sellerPromotion = (sellerSubtotal / subtotal) * promotion;
+                var sellerGst = authoritativeSubtotal == 0
+                    ? 0
+                    : (sellerSubtotal / authoritativeSubtotal) * authoritativeGst;
+                var sellerPromotion = authoritativeSubtotal == 0
+                    ? 0
+                    : (sellerSubtotal / authoritativeSubtotal) * authoritativePromotion;
 
                 var transaction = new TransactionHis
                 {
@@ -700,14 +744,30 @@ namespace JQuery_ECommerceAss.Controllers
                 db.TransactionHis.Add(transaction);
             }
 
-            // SEND EMAIL CONFIRMATION - 使用total amount
+            foreach (var product in products)
+            {
+                product.Quantity -= (int)cartItems
+                    .Where(c => c.ProductID == product.ProductID)
+                    .Sum(c => c.Quantity ?? 0);
+            }
+
+            if (userPromotion != null)
+            {
+                userPromotion.IsUsed = true;
+                userPromotion.UsedDate = DateTime.Now;
+                userPromotion.UsedCount = (userPromotion.UsedCount ?? 0) + 1;
+            }
+
+            db.Carts.RemoveRange(cartItems);
+            db.SaveChanges();
+            transactionScope.Commit();
+
             try
             {
                 var user = db.Users.Find(userId);
                 if (user != null && !string.IsNullOrEmpty(user.UserGmail))
                 {
-                    // 计算total amount（所有 sellers 的总和）
-                    decimal totalAmount = subtotal + gst - promotion;
+                    decimal totalAmount = authoritativeSubtotal + authoritativeGst - authoritativePromotion;
                     SendPurchaseConfirmationEmail(user.UserGmail, user.Username ?? string.Empty, totalAmount, cartItems);
                 }
             }
@@ -716,12 +776,10 @@ namespace JQuery_ECommerceAss.Controllers
                 Console.WriteLine($"Email send failed: {ex.Message}");
             }
 
-            db.Carts.RemoveRange(cartItems);
-            db.SaveChanges();
-
             HttpContext.Session.Remove("AppliedPromoCode");
             HttpContext.Session.Remove("PromotionDiscount");
             HttpContext.Session.Remove("UserPromotionID");
+            HttpContext.Session.Remove("CheckoutToken");
 
             AutoAssignPromotions(userId);
 
@@ -859,6 +917,7 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== TEST PROMOTIONS ====================
+        [NonAction]
         public IActionResult TestPromotions(int userId)
         {
             try
@@ -966,6 +1025,7 @@ namespace JQuery_ECommerceAss.Controllers
             }
         }
 
+        [NonAction]
         public IActionResult CreateTestPromotions()
         {
             try
@@ -1371,6 +1431,20 @@ namespace JQuery_ECommerceAss.Controllers
         {
             var userId = HttpContext.Session.GetString("LoginUser");
             return !string.IsNullOrEmpty(userId);
+        }
+
+        private bool IsPasswordResetVerified()
+        {
+            var email = HttpContext.Session.GetString("Email");
+            var verifiedAt = HttpContext.Session.GetString("PasswordResetVerifiedAt");
+
+            return !string.IsNullOrEmpty(email) &&
+                   DateTime.TryParse(
+                       verifiedAt,
+                       null,
+                       System.Globalization.DateTimeStyles.RoundtripKind,
+                       out var timestamp) &&
+                   DateTime.UtcNow - timestamp <= TimeSpan.FromMinutes(10);
         }
 
         private void SendByGmail(string receiver, string body)

@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JQuery_ECommerceAss.Controllers
 {
+    [AutoValidateAntiforgeryToken]
     public class AdminController : Controller
     {
         private readonly AppDbContext db;
@@ -723,9 +724,9 @@ namespace JQuery_ECommerceAss.Controllers
 
                     foreach (var image in images)
                     {
-                        if(image.Length > 0)
+                        if (image.Length > 0 && FileUploadSecurity.IsSafeImage(image))
                         {
-                            var uniqueFileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(image.FileName);
+                            var uniqueFileName = FileUploadSecurity.CreateSafeFileName(image);
                             var filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
                             using (var fileStream = new FileStream(filePath, FileMode.Create))
@@ -734,6 +735,10 @@ namespace JQuery_ECommerceAss.Controllers
                             }
 
                             imagesUrls.Add("/images/products/" + uniqueFileName);
+                        }
+                        else if (image.Length > 0)
+                        {
+                            return Json(new { success = false, message = "Only valid JPG, PNG, or WEBP images up to 5 MB are allowed." });
                         }
                     }
 
@@ -786,9 +791,9 @@ namespace JQuery_ECommerceAss.Controllers
 
                     foreach (var image in images)
                     {
-                        if(image.Length > 0)
+                        if (image.Length > 0 && FileUploadSecurity.IsSafeImage(image))
                         {
-                            var uniqueFileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(image.FileName);
+                            var uniqueFileName = FileUploadSecurity.CreateSafeFileName(image);
                             var filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
                             using (var fileStream = new FileStream(filePath, FileMode.Create))
@@ -797,6 +802,10 @@ namespace JQuery_ECommerceAss.Controllers
                             }
 
                             imageUrls.Add("/images/products/" + uniqueFileName);
+                        }
+                        else if (image.Length > 0)
+                        {
+                            return Json(new { success = false, message = "Only valid JPG, PNG, or WEBP images up to 5 MB are allowed." });
                         }
                     }
 
