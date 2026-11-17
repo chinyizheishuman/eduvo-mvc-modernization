@@ -1,0 +1,246 @@
+﻿@model List<JQuery_ECommerceAss.Models.Product>
+@{
+    ViewData["Title"] = "Seller Dashboard";
+    var username = Context.Session.GetString("SellerUsername");
+    var lastLogin = Context.Session.GetString("LastLogin");
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewData["Title"]</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .navbar {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            color: #f5576c !important;
+            font-size: 1.5rem;
+        }
+
+        .nav-link {
+            color: #495057 !important;
+            font-weight: 500;
+        }
+
+            .nav-link:hover {
+                color: #f5576c !important;
+            }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #f5576c;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-top: 8px;
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .chart-wrapper {
+            height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="@Url.Action("Dashboard", "Seller")">SELLER PORTAL</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link active" href="@Url.Action("Dashboard", "Seller")"><i class="fas fa-home"></i> Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="@Url.Action("ManageProducts", "Seller")"><i class="fas fa-box"></i> Products</a></li>
+                    <li class="nav-item"><a class="nav-link" href="@Url.Action("CustomerInsights", "Seller")"><i class="fas fa-users"></i> Customers</a></li>
+                    <li class="nav-item"><a class="nav-link" href="@Url.Action("Logout", "Seller")"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <h1 class="fw-bold mb-1">Dashboard</h1>
+        <p class="text-muted mb-4">Welcome back, @username</p>
+
+        <div class="row g-4 mb-4">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalProducts">-</div>
+                    <div class="stat-label">Total Products</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-value" id="activeProducts">-</div>
+                    <div class="stat-label">Active Products</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-value" id="pendingProducts">-</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalStock">-</div>
+                    <div class="stat-label">Total Stock</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-card mb-4">
+            <h5 class="fw-bold mb-3">Stock Overview</h5>
+            <div class="chart-wrapper">
+                <canvas id="stockChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">Your Products</h5>
+                <a href="@Url.Action("AddProduct", "Seller")" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add Product
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Price</th>
+                            <th>Stock</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsTable">
+                        <tr><td colspan="5" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <script>
+        let stockChart;
+
+        $(document).ready(function() {
+            loadStats();
+            loadProducts();
+        });
+
+        function loadStats() {
+            $.ajax({
+                url: '@Url.Action("GetDashboardStatsAjax", "Seller")',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        $('#totalProducts').text(response.data.totalProducts);
+                        $('#activeProducts').text(response.data.activeProducts);
+                        $('#pendingProducts').text(response.data.pendingProducts);
+                        $('#totalStock').text(response.data.totalStock);
+                    }
+                }
+            });
+        }
+
+        function loadProducts() {
+            $.ajax({
+                url: '@Url.Action("GetProductsAjax", "Seller")',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        displayProducts(response.data);
+                        createChart(response.data);
+                    }
+                }
+            });
+        }
+
+        function displayProducts(products) {
+            if (products.length === 0) {
+                $('#productsTable').html('<tr><td colspan="5" class="text-center py-4">No products found</td></tr>');
+                return;
+            }
+            let html = '';
+            products.forEach(p => {
+                const status = p.productStatus === 0 ? '<span class="badge bg-success">Active</span>' :
+                               p.productStatus === 2 ? '<span class="badge bg-warning">Pending</span>' :
+                               '<span class="badge bg-secondary">Inactive</span>';
+                html += `<tr>
+                    <td>${p.productName}</td>
+                    <td class="fw-bold text-primary">RM ${parseFloat(p.unitPrice).toFixed(2)}</td>
+                    <td>${p.quantity}</td>
+                    <td>${status}</td>
+                    <td>
+                        <a href="@Url.Action("EditProduct", "Seller")?id=${p.productID}" class="btn btn-sm btn-outline-primary">Edit</a>
+                        <a href="@Url.Action("DeleteProduct", "Seller")?id=${p.productID}" class="btn btn-sm btn-outline-danger">Delete</a>
+                    </td>
+                </tr>`;
+            });
+            $('#productsTable').html(html);
+        }
+
+        function createChart(products) {
+            const ctx = document.getElementById('stockChart');
+            if (stockChart) stockChart.destroy();
+            stockChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: products.map(p => p.productName.substring(0, 15)),
+                    datasets: [{
+                        label: 'Stock',
+                        data: products.map(p => p.quantity),
+                        backgroundColor: 'rgba(245, 87, 108, 0.7)',
+                        borderColor: 'rgba(245, 87, 108, 1)',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,633 @@
+﻿@{
+    ViewData["Title"] = "Dashboard";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Admin Portal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/admin-modern.css" />
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-header">
+                <a href="@Url.Action("Dashboard", "Admin")" class="sidebar-logo">
+                    <div class="sidebar-logo-icon">
+                        <i class="fas fa-store"></i>
+                    </div>
+                    <span class="sidebar-logo-text">E-Commerce</span>
+                </a>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <h6 class="sidebar-section-title">Main Menu</h6>
+                    <ul class="sidebar-menu">
+                        <li class="sidebar-menu-item">
+                            <a href="@Url.Action("Dashboard", "Admin")" class="sidebar-link active">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-menu-item">
+                            <a href="@Url.Action("Index", "Admin")" class="sidebar-link">
+                                <i class="fas fa-box"></i>
+                                <span>Products</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-menu-item">
+                            <a href="@Url.Action("ManageUser", "Admin")" class="sidebar-link">
+                                <i class="fas fa-users"></i>
+                                <span>Users</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-menu-item">
+                            <a href="@Url.Action("ManageSeller", "Admin")" class="sidebar-link">
+                                <i class="fas fa-store-alt"></i>
+                                <span>Sellers</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h6 class="sidebar-section-title">Account</h6>
+                    <ul class="sidebar-menu">
+                        <li class="sidebar-menu-item">
+                            <a href="@Url.Action("Logout", "Admin")" class="sidebar-link">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Logout</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            @if (Context.Session.GetString("LastLogin") != null)
+            {
+                <div class="sidebar-footer">
+                    <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem;">
+                        <i class="fas fa-clock"></i> Last Login
+                    </div>
+                    <div style="font-size: 0.875rem; font-weight: 600; color: #374151;">
+                        @Context.Session.GetString("LastLogin")
+                    </div>
+                </div>
+            }
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Top Bar -->
+            <div class="admin-topbar">
+                <div class="topbar-title">
+                    <i class="fas fa-chart-line"></i>
+                    Dashboard
+                </div>
+                <div class="topbar-actions">
+                    <div class="topbar-search">
+                        <i class="fas fa-search"></i>
+                        <input type="text" placeholder="Search..." id="globalSearch">
+                    </div>
+                    <button class="topbar-icon-btn" title="Notifications">
+                        <i class="fas fa-bell"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="admin-content">
+                <!-- Welcome Section -->
+                <div class="content-header">
+                    <h1 class="content-title">Welcome Back, Admin! 👋</h1>
+                    <p class="content-subtitle">Here's what's happening with your e-commerce platform today.</p>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card" onclick="showData('products')">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-label">Total Products</div>
+                                <div class="stat-card-value" id="totalProducts">0</div>
+                            </div>
+                            <div class="stat-card-icon blue">
+                                <i class="fas fa-box"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card-footer">
+                            <span class="text-muted">Click to view all products</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card" onclick="showData('users')">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-label">Total Users</div>
+                                <div class="stat-card-value" id="totalUsers">0</div>
+                            </div>
+                            <div class="stat-card-icon purple">
+                                <i class="fas fa-users"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card-footer">
+                            <span class="text-muted">Click to view all users</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card" onclick="showData('sellers')">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-label">Total Sellers</div>
+                                <div class="stat-card-value" id="totalSellers">0</div>
+                            </div>
+                            <div class="stat-card-icon green">
+                                <i class="fas fa-store-alt"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card-footer">
+                            <span class="text-muted">Click to view all sellers</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card" onclick="showData('active-products')">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-label">Active Products</div>
+                                <div class="stat-card-value" id="activeProducts">0</div>
+                            </div>
+                            <div class="stat-card-icon yellow">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card-footer">
+                            <span class="text-muted">Click to view active products</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Display Section -->
+                <div id="dataDisplaySection" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title" id="dataDisplayTitle">
+                                <i class="fas fa-list"></i> Data View
+                            </h3>
+                            <button class="btn btn-sm btn-secondary" onclick="hideDataDisplay()">
+                                <i class="fas fa-times"></i> Close
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <!-- Status Filter Buttons -->
+                            <div id="statusFilterButtons" style="display: none; margin-bottom: 1.5rem;">
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-outline status-filter-btn active" onclick="filterByStatus('all')">All</button>
+                                    <button class="btn btn-sm btn-outline status-filter-btn" onclick="filterByStatus(0)">Active</button>
+                                    <button class="btn btn-sm btn-outline status-filter-btn" onclick="filterByStatus(1)">Inactive</button>
+                                    <button class="btn btn-sm btn-outline status-filter-btn" onclick="filterByStatus(2)">Pending</button>
+                                    <button class="btn btn-sm btn-outline status-filter-btn" onclick="filterByStatus(3)">Suspended</button>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead id="dataTableHead"></thead>
+                                    <tbody id="dataTableBody">
+                                        <tr>
+                                            <td colspan="10" class="text-center" style="padding: 3rem;">
+                                                <div class="spinner" style="margin: 0 auto;"></div>
+                                                <p style="margin-top: 1rem; color: #6b7280;">Loading data...</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Search Section -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-search"></i> Quick Search
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="productSearch" placeholder="Search products...">
+                            </div>
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="userSearch" placeholder="Search users...">
+                            </div>
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="sellerSearch" placeholder="Search sellers...">
+                            </div>
+                        </div>
+                        <div id="searchResults"></div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-chart-pie"></i> Products by Status
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="statusChart" style="max-height: 300px;"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-chart-bar"></i> Recent Products Price
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="recentProductsChart" style="max-height: 300px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+
+    <script>
+        let statusChart, recentProductsChart;
+        let allData = { products: [], users: [], sellers: [] };
+        let currentDataType = '';
+        let currentFilter = 'all';
+
+        $(document).ready(function() {
+            loadDashboardData();
+            setupSearch('#productSearch', 'products');
+            setupSearch('#userSearch', 'users');
+            setupSearch('#sellerSearch', 'sellers');
+            setInterval(loadDashboardData, 30000);
+        });
+
+        function getStatusInfo(status) {
+            const statusMap = {
+                0: { text: 'Active', class: 'badge-success' },
+                1: { text: 'Inactive', class: 'badge-secondary' },
+                2: { text: 'Pending', class: 'badge-warning' },
+                3: { text: 'Suspended', class: 'badge-danger' },
+                4: { text: 'Approved', class: 'badge-primary' }
+            };
+            return statusMap[status] || { text: 'Unknown', class: 'badge-secondary' };
+        }
+
+        function showData(type) {
+            currentDataType = type;
+            currentFilter = 'all';
+            $('#dataDisplaySection').slideDown();
+            $('html, body').animate({
+                scrollTop: $('#dataDisplaySection').offset().top - 100
+            }, 500);
+            loadDataForDisplay(type);
+        }
+
+        function hideDataDisplay() {
+            $('#dataDisplaySection').slideUp();
+        }
+
+        function filterByStatus(status) {
+            currentFilter = status;
+            $('.status-filter-btn').removeClass('active');
+            event.target.classList.add('active');
+            loadDataForDisplay(currentDataType);
+        }
+
+        function loadDataForDisplay(type) {
+            $('#dataTableBody').html('<tr><td colspan="10" class="text-center" style="padding: 3rem;"><div class="spinner" style="margin: 0 auto;"></div><p style="margin-top: 1rem;">Loading...</p></td></tr>');
+
+            let url = '';
+            let title = '';
+
+            switch(type) {
+                case 'products':
+                    url = '@Url.Action("GetProductsJson", "Admin")';
+                    title = '<i class="fas fa-box"></i> All Products';
+                    $('#statusFilterButtons').show();
+                    break;
+                case 'active-products':
+                    url = '@Url.Action("GetProductsJson", "Admin")';
+                    title = '<i class="fas fa-check-circle"></i> Active Products';
+                    $('#statusFilterButtons').hide();
+                    currentFilter = 0;
+                    break;
+                case 'users':
+                    url = '@Url.Action("GetUsersJson", "Admin")';
+                    title = '<i class="fas fa-users"></i> All Users';
+                    $('#statusFilterButtons').hide();
+                    break;
+                case 'sellers':
+                    url = '@Url.Action("GetSellersJson", "Admin")';
+                    title = '<i class="fas fa-store-alt"></i> All Sellers';
+                    $('#statusFilterButtons').hide();
+                    break;
+            }
+
+            $('#dataDisplayTitle').html(title);
+
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        displayData(response.data, type);
+                    }
+                },
+                error: function() {
+                    $('#dataTableBody').html('<tr><td colspan="10" class="text-center">Error loading data</td></tr>');
+                }
+            });
+        }
+
+        function displayData(data, type) {
+            let headHtml = '<tr>';
+            let bodyHtml = '';
+
+            let filteredData = data;
+            if ((type === 'products' || type === 'active-products') && currentFilter !== 'all') {
+                filteredData = data.filter(item => item.productStatus === currentFilter);
+            }
+
+            if (type === 'products' || type === 'active-products') {
+                headHtml += '<th>ID</th><th>Image</th><th>Name</th><th>Price</th><th>Quantity</th><th>Seller</th><th>Status</th><th>Actions</th>';
+
+                filteredData.forEach(p => {
+                    const statusInfo = getStatusInfo(p.productStatus);
+                    const imageUrl = p.imagePath ? p.imagePath.split(',')[0] : '/images/no-image.png';
+
+                    bodyHtml += `
+                        <tr>
+                            <td>${p.productID}</td>
+                            <td><img src="${imageUrl}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 8px;" alt="${p.productName}"></td>
+                            <td><strong>${p.productName || 'N/A'}</strong></td>
+                            <td><strong style="color: #2563eb;">RM ${(p.unitPrice || 0).toFixed(2)}</strong></td>
+                            <td>${p.quantity || 0}</td>
+                            <td>${p.sellerName || 'N/A'}</td>
+                            <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                            <td><a href="@Url.Action("Index", "Admin")" class="btn btn-sm btn-primary">View</a></td>
+                        </tr>
+                    `;
+                });
+            } else if (type === 'users') {
+                headHtml += '<th>ID</th><th>Username</th><th>Email</th><th>Phone</th><th>Status</th><th>Registered</th><th>Actions</th>';
+
+                filteredData.forEach(u => {
+                    const statusInfo = getStatusInfo(u.userStatus);
+
+                    bodyHtml += `
+                        <tr>
+                            <td>${u.userID}</td>
+                            <td><strong>${u.username || 'N/A'}</strong></td>
+                            <td>${u.userGmail || 'N/A'}</td>
+                            <td>${u.userPhoneNum || 'N/A'}</td>
+                            <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                            <td>${u.dateTime ? new Date(u.dateTime).toLocaleDateString() : 'N/A'}</td>
+                            <td><a href="@Url.Action("ManageUser", "Admin")" class="btn btn-sm btn-primary">View</a></td>
+                        </tr>
+                    `;
+                });
+            } else if (type === 'sellers') {
+                headHtml += '<th>ID</th><th>Username</th><th>Email</th><th>Status</th><th>Registered</th><th>Actions</th>';
+
+                filteredData.forEach(s => {
+                    const statusInfo = getStatusInfo(s.sellerStatus);
+
+                    bodyHtml += `
+                        <tr>
+                            <td>${s.sellerID}</td>
+                            <td><strong>${s.sellerUsername || 'N/A'}</strong></td>
+                            <td>${s.sellerEmail || 'N/A'}</td>
+                            <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                            <td>${s.dateTime ? new Date(s.dateTime).toLocaleDateString() : 'N/A'}</td>
+                            <td><a href="@Url.Action("ManageSeller", "Admin")" class="btn btn-sm btn-primary">View</a></td>
+                        </tr>
+                    `;
+                });
+            }
+
+            headHtml += '</tr>';
+
+            if (filteredData.length === 0) {
+                bodyHtml = '<tr><td colspan="10" class="text-center" style="padding: 2rem; color: #6b7280;">No data found</td></tr>';
+            }
+
+            $('#dataTableHead').html(headHtml);
+            $('#dataTableBody').html(bodyHtml);
+        }
+
+        function loadDashboardData() {
+            $.ajax({
+                url: '@Url.Action("GetDashboardStats", "Admin")',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        updateStatCards(response.data);
+                        updateCharts(response.data);
+                    }
+                },
+                error: function() {
+                    console.error('Error loading dashboard');
+                }
+            });
+        }
+
+        function updateStatCards(data) {
+            animateValue('totalProducts', 0, data.totalProducts, 1000);
+            animateValue('totalUsers', 0, data.totalUsers, 1000);
+            animateValue('totalSellers', 0, data.totalSellers, 1000);
+            animateValue('activeProducts', 0, data.activeProducts, 1000);
+        }
+
+        function animateValue(id, start, end, duration) {
+            const element = document.getElementById(id);
+            const range = end - start;
+            const increment = end > start ? 1 : -1;
+            const stepTime = Math.abs(Math.floor(duration / range));
+            let current = start;
+            if (range === 0) {
+                element.textContent = end;
+                return;
+            }
+            const timer = setInterval(function() {
+                current += increment;
+                element.textContent = current;
+                if (current == end) {
+                    clearInterval(timer);
+                }
+            }, stepTime);
+        }
+
+        function updateCharts(data) {
+            const statusCtx = document.getElementById('statusChart').getContext('2d');
+            if (statusChart) statusChart.destroy();
+
+            const statusLabels = data.productsByStatus.map(s => s.status);
+            const statusCounts = data.productsByStatus.map(s => s.count);
+
+            statusChart = new Chart(statusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: statusLabels,
+                    datasets: [{
+                        data: statusCounts,
+                        backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#6b7280', '#3b82f6'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+
+            const recentCtx = document.getElementById('recentProductsChart').getContext('2d');
+            if (recentProductsChart) recentProductsChart.destroy();
+
+            const productNames = data.recentProducts.map(p => p.productName && p.productName.length > 15 ? p.productName.substring(0, 15) + '...' : p.productName || 'N/A');
+            const productPrices = data.recentProducts.map(p => p.productPrice || 0);
+
+            recentProductsChart = new Chart(recentCtx, {
+                type: 'bar',
+                data: {
+                    labels: productNames,
+                    datasets: [{
+                        label: 'Price (RM)',
+                        data: productPrices,
+                        backgroundColor: 'rgba(37, 99, 235, 0.8)',
+                        borderColor: 'rgba(37, 99, 235, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function setupSearch(inputSelector, type) {
+            let searchTimeout;
+            $(inputSelector).on('keyup', function() {
+                clearTimeout(searchTimeout);
+                const searchTerm = $(this).val();
+                if (searchTerm.length === 0) {
+                    $('#searchResults').empty();
+                    return;
+                }
+                searchTimeout = setTimeout(function() {
+                    if (searchTerm.length >= 2) {
+                        performSearch(searchTerm, type);
+                    }
+                }, 300);
+            });
+        }
+
+        function performSearch(searchTerm, type) {
+            let url = '';
+            switch(type) {
+                case 'products':
+                    url = '@Url.Action("SearchProducts", "Admin")';
+                    break;
+                case 'users':
+                    url = '@Url.Action("SearchUsers", "Admin")';
+                    break;
+                case 'sellers':
+                    url = '@Url.Action("SearchSellers", "Admin")';
+                    break;
+            }
+            $.ajax({
+                url: url,
+                type: 'GET',
+                data: { searchTerm: searchTerm },
+                success: function(response) {
+                    if (response.success) {
+                        displaySearchResults(response.data, type);
+                    }
+                },
+                error: function() {
+                    $('#searchResults').html('<div class="alert alert-danger">Error performing search</div>');
+                }
+            });
+        }
+
+        function displaySearchResults(data, type) {
+            const container = $('#searchResults');
+            container.empty();
+            if (data.length === 0) {
+                container.html('<div class="alert alert-info">No results found</div>');
+                return;
+            }
+            let html = '<div class="table-responsive"><table class="data-table"><thead><tr>';
+            if (type === 'products') {
+                html += '<th>ID</th><th>Name</th><th>Price</th><th>Status</th><th>Action</th>';
+            } else if (type === 'users') {
+                html += '<th>ID</th><th>Username</th><th>Email</th><th>Status</th><th>Action</th>';
+            } else if (type === 'sellers') {
+                html += '<th>ID</th><th>Username</th><th>Email</th><th>Status</th><th>Action</th>';
+            }
+            html += '</tr></thead><tbody>';
+            data.forEach(item => {
+                html += '<tr>';
+                if (type === 'products') {
+                    const statusInfo = getStatusInfo(item.productStatus);
+                    html += `<td>${item.productID}</td>
+                             <td><strong>${item.productName || 'N/A'}</strong></td>
+                             <td><strong style="color: #2563eb;">RM${(item.unitPrice || 0).toFixed(2)}</strong></td>
+                             <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                             <td><a href="@Url.Action("Index", "Admin")" class="btn btn-sm btn-primary">View</a></td>`;
+                } else if (type === 'users') {
+                    const statusInfo = getStatusInfo(item.userStatus);
+                    html += `<td>${item.userID}</td>
+                             <td><strong>${item.username || 'N/A'}</strong></td>
+                             <td>${item.userGmail || 'N/A'}</td>
+                             <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                             <td><a href="@Url.Action("ManageUser", "Admin")" class="btn btn-sm btn-primary">View</a></td>`;
+                } else if (type === 'sellers') {
+                    const statusInfo = getStatusInfo(item.sellerStatus);
+                    html += `<td>${item.sellerID}</td>
+                             <td><strong>${item.sellerUsername || 'N/A'}</strong></td>
+                             <td>${item.sellerEmail || 'N/A'}</td>
+                             <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                             <td><a href="@Url.Action("ManageSeller", "Admin")" class="btn btn-sm btn-primary">View</a></td>`;
+                }
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            container.html(html);
+        }
+    </script>
+</body>
+</html>

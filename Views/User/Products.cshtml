@@ -1,0 +1,252 @@
+﻿@model List<JQuery_ECommerceAss.Models.Product>
+@{
+    ViewData["Title"] = "Products";
+    var username = Context.Session.GetString("Username");
+    var lastLogin = Context.Session.GetString("LastLogin");
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewData["Title"]</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .navbar {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            color: #667eea !important;
+            font-size: 1.5rem;
+        }
+
+        .nav-link {
+            color: #495057 !important;
+            font-weight: 500;
+        }
+
+            .nav-link:hover {
+                color: #667eea !important;
+            }
+
+        .product-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.3s;
+            border: 1px solid #e9ecef;
+        }
+
+            .product-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            }
+
+        .product-img {
+            height: 250px;
+            object-fit: cover;
+            background: #f8f9fa;
+        }
+
+            .product-img img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+
+        .product-title {
+            font-weight: 600;
+            color: #212529;
+            margin-bottom: 8px;
+        }
+
+        .product-price {
+            color: #667eea;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .qty-controls {
+            display: inline-flex;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .qty-btn {
+            border: none;
+            background: #667eea;
+            color: white;
+            width: 35px;
+            height: 35px;
+            cursor: pointer;
+        }
+
+            .qty-btn:hover {
+                background: #764ba2;
+            }
+
+        .qty-input {
+            width: 50px;
+            text-align: center;
+            border: none;
+            font-weight: 600;
+        }
+
+        .btn-add-cart {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 600;
+            width: 100%;
+        }
+
+            .btn-add-cart:hover {
+                background: #764ba2;
+            }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="@Url.Action("Index", "User")">GEEK-LAB</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="@Url.Action("Index", "User")"><i class="fas fa-home"></i> Home</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="@Url.Action("Products", "User")"><i class="fas fa-shopping-bag"></i> Products</a></li>
+                    <li class="nav-item"><a class="nav-link" href="@Url.Action("Cart", "User")"><i class="fas fa-shopping-cart"></i> Cart</a></li>
+                    <li class="nav-item"><a class="nav-link" href="@Url.Action("MyPromotions", "User")"><i class="fas fa-tags"></i> Promotions</a></li>
+                    <li class="nav-item"><a class="nav-link" href="@Url.Action("Profile", "User")"><i class="fas fa-user"></i> Profile</a></li>
+                    <li class="nav-item"><a class="nav-link" href="@Url.Action("Logout", "User")"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <h1 class="fw-bold">All Products</h1>
+            <p class="text-muted">Browse our collection</p>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        @if (Model != null && Model.Any())
+        {
+            <div class="row g-4">
+                @foreach (var product in Model)
+                {
+                    <div class="col-md-4 col-lg-3">
+                        <div class="product-card">
+                            <div class="product-img">
+                                @if (!string.IsNullOrEmpty(product.ImagePath))
+                                {
+                                    <img src="@product.ImagePath" alt="@product.ProductName">
+                                }
+                                else
+                                {
+                                    <div class="d-flex align-items-center justify-content-center h-100">
+                                        <i class="fas fa-box fa-3x text-muted"></i>
+                                    </div>
+                                }
+                            </div>
+                            <div class="p-3">
+                                <h5 class="product-title">@product.ProductName</h5>
+                                <p class="text-muted small mb-2">@product.Description</p>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="product-price">RM @product.UnitPrice?.ToString("0.00")</span>
+                                    <span class="badge bg-secondary">Stock: @product.Quantity</span>
+                                </div>
+                                <div class="text-center mb-3">
+                                    <div class="qty-controls">
+                                        <button class="qty-btn" onclick="updateQty(@product.ProductID, -1, @product.Quantity)">
+                                            <i class="fas fa-minus"></i>
+                                        </button>
+                                        <input type="number" id="qty-@product.ProductID" class="qty-input" value="1" min="1" max="@product.Quantity" readonly>
+                                        <button class="qty-btn" onclick="updateQty(@product.ProductID, 1, @product.Quantity)">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button class="btn-add-cart" onclick="addToCart(@product.ProductID, @product.Quantity)">
+                                    <i class="fas fa-cart-plus"></i> Add to Cart
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="fas fa-box-open fa-4x text-muted mb-3"></i>
+                <h3>No Products Available</h3>
+                <p class="text-muted">Check back later!</p>
+            </div>
+        }
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+    <script>
+        function updateQty(productId, change, maxQty) {
+            const input = document.getElementById(`qty-${productId}`);
+            let newQty = parseInt(input.value) + change;
+            if (newQty < 1) newQty = 1;
+            if (newQty > maxQty) newQty = maxQty;
+            input.value = newQty;
+        }
+
+        function addToCart(productId, maxQty) {
+            const quantity = parseInt(document.getElementById(`qty-${productId}`).value);
+            if (quantity < 1 || quantity > maxQty) {
+                showAlert('danger', `Quantity must be between 1 and ${maxQty}`);
+                return;
+            }
+
+            $.ajax({
+                url: '@Url.Action("AddToCartAjax", "User")',
+                type: 'POST',
+                data: { productId: productId, quantity: quantity },
+                success: function(response) {
+                    if (response.success) {
+                        showAlert('success', response.message);
+                        document.getElementById(`qty-${productId}`).value = 1;
+                    } else {
+                        showAlert('danger', response.message);
+                    }
+                },
+                error: function() {
+                    showAlert('danger', 'Failed to add to cart');
+                }
+            });
+        }
+
+        function showAlert(type, message) {
+            const alert = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>`;
+            $('#alertContainer').html(alert);
+            setTimeout(() => $('.alert').fadeOut(), 3000);
+        }
+    </script>
+</body>
+</html>

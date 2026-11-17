@@ -1,0 +1,580 @@
+﻿@{
+    ViewData["Title"] = "User Management";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Admin Portal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/admin-modern.css" />
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-header">
+                <a href="@Url.Action("Dashboard", "Admin")" class="sidebar-logo">
+                    <div class="sidebar-logo-icon">
+                        <i class="fas fa-store"></i>
+                    </div>
+                    <span class="sidebar-logo-text">E-Commerce</span>
+                </a>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <h6 class="sidebar-section-title">Main Menu</h6>
+                    <ul class="sidebar-menu">
+                        <li class="sidebar-menu-item">
+                            <a href="@Url.Action("Dashboard", "Admin")" class="sidebar-link">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-menu-item">
+                            <a href="@Url.Action("Index", "Admin")" class="sidebar-link">
+                                <i class="fas fa-box"></i>
+                                <span>Products</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-menu-item">
+                            <a href="@Url.Action("ManageUser", "Admin")" class="sidebar-link active">
+                                <i class="fas fa-users"></i>
+                                <span>Users</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-menu-item">
+                            <a href="@Url.Action("ManageSeller", "Admin")" class="sidebar-link">
+                                <i class="fas fa-store-alt"></i>
+                                <span>Sellers</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h6 class="sidebar-section-title">Account</h6>
+                    <ul class="sidebar-menu">
+                        <li class="sidebar-menu-item">
+                            <a href="@Url.Action("Logout", "Admin")" class="sidebar-link">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Logout</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            @if (Context.Session.GetString("LastLogin") != null)
+            {
+                <div class="sidebar-footer">
+                    <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem;">
+                        <i class="fas fa-clock"></i> Last Login
+                    </div>
+                    <div style="font-size: 0.875rem; font-weight: 600; color: #374151;">
+                        @Context.Session.GetString("LastLogin")
+                    </div>
+                </div>
+            }
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Top Bar -->
+            <div class="admin-topbar">
+                <div class="topbar-title">
+                    <i class="fas fa-users"></i>
+                    User Management
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-primary" onclick="$('#createUserModal').show()">
+                        <i class="fas fa-plus"></i>
+                        Add User
+                    </button>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="admin-content">
+                <!-- Search & Filter -->
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center gap-3">
+                            <div class="search-box" style="max-width: 400px;">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="searchInput" placeholder="Search users by username, email, phone...">
+                            </div>
+                            <div>
+                                <span class="badge badge-primary" id="userCount" style="font-size: 0.9375rem; padding: 0.5rem 1rem;">
+                                    Loading...
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alert Container -->
+                <div id="alertContainer"></div>
+
+                <!-- Users Table -->
+                <div class="table-container">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Status</th>
+                                    <th>Registered</th>
+                                    <th>Login Tries</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center" style="padding: 3rem;">
+                                        <div class="spinner" style="margin: 0 auto;"></div>
+                                        <p style="margin-top: 1rem; color: #6b7280;">Loading users...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create User Modal -->
+    <div class="modal fade" id="createUserModal" tabindex="-1" style="display: none;">
+        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3 class="modal-title">Add New User</h3>
+                    <button type="button" class="modal-close" onclick="$('#createUserModal').hide()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="createUserForm">
+                        <div class="form-group">
+                            <label class="form-label form-label-required">Username</label>
+                            <input type="text" class="form-control" name="Username" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label form-label-required">Password</label>
+                            <input type="password" class="form-control" name="UserPassword" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label form-label-required">Email</label>
+                            <input type="email" class="form-control" name="UserGmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" name="UserPhoneNum">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">User Status</label>
+                            <select class="form-control form-select" name="UserStatus">
+                                <option value="0">Active</option>
+                                <option value="1">Inactive</option>
+                                <option value="2">Pending</option>
+                                <option value="3">Suspended</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="$('#createUserModal').hide()">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveUserBtn">
+                        <i class="fas fa-save"></i> Save User
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal fade" id="editUserModal" tabindex="-1" style="display: none;">
+        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3 class="modal-title">Edit User</h3>
+                    <button type="button" class="modal-close" onclick="$('#editUserModal').hide()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="editUserForm">
+                        <input type="hidden" id="editUserID" name="UserID">
+                        <div class="form-group">
+                            <label class="form-label form-label-required">Username</label>
+                            <input type="text" class="form-control" id="editUsername" name="Username" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label form-label-required">Email</label>
+                            <input type="email" class="form-control" id="editUserGmail" name="UserGmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" id="editUserPhoneNum" name="UserPhoneNum">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-exclamation-triangle"></i> Login Attempts
+                            </label>
+                            <input type="number" class="form-control" id="editLoginTry" name="LoginTry" min="0" max="10">
+                            <small class="form-help">
+                                <i class="fas fa-info-circle"></i> Account locks at 3 failed attempts. Set to 0 to unlock.
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">User Status</label>
+                            <select class="form-control form-select" id="editUserStatus" name="UserStatus">
+                                <option value="0">Active</option>
+                                <option value="1">Inactive</option>
+                                <option value="2">Pending</option>
+                                <option value="3">Suspended</option>
+                            </select>
+                            <small class="form-help">
+                                <i class="fas fa-lightbulb"></i> Changing from Suspended to Active will auto-reset login attempts
+                            </small>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="$('#editUserModal').hide()">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="updateUserBtn">
+                        <i class="fas fa-save"></i> Update User
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Details Modal -->
+    <div class="modal fade" id="viewDetailsModal" tabindex="-1" style="display: none;">
+        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3 class="modal-title">User Details</h3>
+                    <button type="button" class="modal-close" onclick="$('#viewDetailsModal').hide()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body" id="userDetailsContent"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="$('#viewDetailsModal').hide()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+
+    <script>
+        let allUsers = [];
+
+        $(document).ready(function() {
+            loadUsers();
+
+            let searchTimeout;
+            $('#searchInput').on('keyup', function() {
+                clearTimeout(searchTimeout);
+                const searchTerm = $(this).val();
+
+                searchTimeout = setTimeout(function() {
+                    if (searchTerm.length > 0) {
+                        searchUsers(searchTerm);
+                    } else {
+                        renderUsers(allUsers);
+                    }
+                }, 300);
+            });
+
+            $('#saveUserBtn').on('click', saveUser);
+            $('#updateUserBtn').on('click', updateUser);
+        });
+
+        function getStatusInfo(status) {
+            const statusMap = {
+                0: { text: 'Active', class: 'badge-success' },
+                1: { text: 'Inactive', class: 'badge-secondary' },
+                2: { text: 'Pending', class: 'badge-warning' },
+                3: { text: 'Suspended', class: 'badge-danger' }
+            };
+            return statusMap[status] || { text: 'Unknown', class: 'badge-secondary' };
+        }
+
+        function loadUsers() {
+            $.ajax({
+                url: '@Url.Action("GetUsersJson", "Admin")',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        allUsers = response.data;
+                        renderUsers(allUsers);
+                    } else {
+                        showAlert('danger', response.message);
+                        $('#usersTableBody').html('<tr><td colspan="8" class="text-center">Failed to load users</td></tr>');
+                        $('#userCount').text('0 users');
+                    }
+                },
+                error: function() {
+                    showAlert('danger', 'Error loading users');
+                    $('#usersTableBody').html('<tr><td colspan="8" class="text-center">Error loading users</td></tr>');
+                    $('#userCount').text('0 users');
+                }
+            });
+        }
+
+        function renderUsers(users) {
+            const tbody = $('#usersTableBody');
+            tbody.empty();
+
+            if (users.length === 0) {
+                tbody.append('<tr><td colspan="8" class="text-center" style="padding: 2rem; color: #6b7280;">No users found</td></tr>');
+                $('#userCount').text('0 users');
+                return;
+            }
+
+            $('#userCount').text(`${users.length} user${users.length > 1 ? 's' : ''}`);
+
+            users.forEach(user => {
+                const statusInfo = getStatusInfo(user.userStatus);
+                const registeredDate = user.dateTime ? new Date(user.dateTime).toLocaleDateString() : 'N/A';
+                const loginTryBadge = user.loginTry >= 3 ? `<span class="badge badge-danger"><i class="fas fa-lock"></i> ${user.loginTry}</span>` : user.loginTry || 0;
+
+                const row = `
+                    <tr>
+                        <td>${user.userID}</td>
+                        <td><strong>${user.username || 'N/A'}</strong></td>
+                        <td>${user.userGmail || 'N/A'}</td>
+                        <td>${user.userPhoneNum || 'N/A'}</td>
+                        <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                        <td>${registeredDate}</td>
+                        <td>${loginTryBadge}</td>
+                        <td>
+                            <div class="table-actions">
+                                <button class="btn btn-sm btn-icon btn-primary" onclick="viewDetails(${user.userID})" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-sm btn-icon btn-secondary" onclick="editUser(${user.userID})" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-icon ${user.userStatus === 0 ? 'btn-danger' : 'btn-success'}"
+                                        onclick="toggleStatus(${user.userID}, ${user.userStatus})"
+                                        title="${user.userStatus === 0 ? 'Deactivate' : 'Activate'}">
+                                    <i class="fas fa-${user.userStatus === 0 ? 'ban' : 'check'}"></i>
+                                </button>
+                                <button class="btn btn-sm btn-icon btn-danger" onclick="deleteUser(${user.userID})" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                tbody.append(row);
+            });
+        }
+
+        function searchUsers(searchTerm) {
+            $.ajax({
+                url: '@Url.Action("SearchUsers", "Admin")',
+                type: 'GET',
+                data: { searchTerm: searchTerm },
+                success: function(response) {
+                    if (response.success) {
+                        renderUsers(response.data);
+                    }
+                }
+            });
+        }
+
+        function saveUser() {
+            const formData = new FormData($('#createUserForm')[0]);
+
+            $.ajax({
+                url: '@Url.Action("CreateUserAjax", "Admin")',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        showAlert('success', response.message);
+                        $('#createUserModal').hide();
+                        $('#createUserForm')[0].reset();
+                        loadUsers();
+                    } else {
+                        showAlert('danger', response.message);
+                    }
+                },
+                error: function() {
+                    showAlert('danger', 'Error creating user');
+                }
+            });
+        }
+
+        function editUser(userId) {
+            const user = allUsers.find(u => u.userID === userId);
+            if (!user) return;
+
+            $('#editUserID').val(user.userID);
+            $('#editUsername').val(user.username);
+            $('#editUserGmail').val(user.userGmail);
+            $('#editUserPhoneNum').val(user.userPhoneNum);
+            $('#editLoginTry').val(user.loginTry || 0);
+            $('#editUserStatus').val(user.userStatus);
+
+            $('#editUserModal').show();
+        }
+
+        function updateUser() {
+            const formData = new FormData($('#editUserForm')[0]);
+
+            $.ajax({
+                url: '@Url.Action("UpdateUserAjax", "Admin")',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        showAlert('success', response.message);
+                        $('#editUserModal').hide();
+                        loadUsers();
+                    } else {
+                        showAlert('danger', response.message);
+                    }
+                },
+                error: function() {
+                    showAlert('danger', 'Error updating user');
+                }
+            });
+        }
+
+        function viewDetails(userId) {
+            $.ajax({
+                url: '@Url.Action("GetUserDetailsJson", "Admin")',
+                type: 'GET',
+                data: { id: userId },
+                success: function(response) {
+                    if (response.success) {
+                        const u = response.data;
+                        const statusInfo = getStatusInfo(u.userStatus);
+                        const registeredDate = u.registrationDate ? new Date(u.registrationDate).toLocaleDateString() : 'N/A';
+                        const loginTryWarning = u.loginTry >= 3 ? '<span class="badge badge-danger"><i class="fas fa-exclamation-triangle"></i> Account Locked!</span>' : '';
+
+                        const html = `
+                            <div style="display: grid; gap: 1rem;">
+                                <div>
+                                    <strong style="color: #6b7280; font-size: 0.875rem;">User ID:</strong>
+                                    <p>${u.userID}</p>
+                                </div>
+                                <div>
+                                    <strong style="color: #6b7280; font-size: 0.875rem;">Username:</strong>
+                                    <p>${u.username || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <strong style="color: #6b7280; font-size: 0.875rem;">Email:</strong>
+                                    <p>${u.userGmail || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <strong style="color: #6b7280; font-size: 0.875rem;">Phone Number:</strong>
+                                    <p>${u.userPhoneNum || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <strong style="color: #6b7280; font-size: 0.875rem;">Status:</strong>
+                                    <p><span class="badge ${statusInfo.class}">${statusInfo.text}</span></p>
+                                </div>
+                                <div>
+                                    <strong style="color: #6b7280; font-size: 0.875rem;">Registered Date:</strong>
+                                    <p>${registeredDate}</p>
+                                </div>
+                                <div>
+                                    <strong style="color: #6b7280; font-size: 0.875rem;">Login Attempts:</strong>
+                                    <p>${u.loginTry || 0} ${loginTryWarning}</p>
+                                </div>
+                            </div>
+                        `;
+
+                        $('#userDetailsContent').html(html);
+                        $('#viewDetailsModal').show();
+                    }
+                }
+            });
+        }
+
+        function toggleStatus(userId, currentStatus) {
+            const newStatus = currentStatus === 0 ? 1 : 0;
+            const action = newStatus === 1 ? 'deactivate' : 'activate';
+
+            if (!confirm(`Are you sure you want to ${action} this user?`)) {
+                return;
+            }
+
+            $.ajax({
+                url: '@Url.Action("UpdateUserStatusAjax", "Admin")',
+                type: 'POST',
+                data: { id: userId, status: newStatus },
+                success: function(response) {
+                    if (response.success) {
+                        showAlert('success', response.message);
+                        loadUsers();
+                    } else {
+                        showAlert('danger', response.message);
+                    }
+                }
+            });
+        }
+
+        function deleteUser(userId) {
+            if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+                return;
+            }
+
+            $.ajax({
+                url: '@Url.Action("DeleteUserAjax", "Admin")',
+                type: 'POST',
+                data: { id: userId },
+                success: function(response) {
+                    if (response.success) {
+                        showAlert('success', response.message);
+                        loadUsers();
+                    } else {
+                        showAlert('danger', response.message);
+                    }
+                }
+            });
+        }
+
+        function showAlert(type, message) {
+            const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+            const icon = type === 'success' ? 'check-circle' : 'exclamation-circle';
+
+            const alert = `
+                <div class="alert ${alertClass}">
+                    <i class="fas fa-${icon}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+
+            $('#alertContainer').html(alert);
+
+            setTimeout(function() {
+                $('.alert').fadeOut(function() {
+                    $(this).remove();
+                });
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
