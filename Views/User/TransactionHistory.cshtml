@@ -1,6 +1,6 @@
 ﻿@model List<JQuery_ECommerceAss.Models.TransactionHis>
 @{
-    ViewData["Title"] = "Transaction History";
+    ViewData["Title"] = "Order History";
     var username = Context.Session.GetString("Username");
     var lastLogin = Context.Session.GetString("LastLogin");
     Layout = null;
@@ -74,12 +74,13 @@
             margin-bottom: 15px;
         }
     </style>
+    <link rel="stylesheet" href="~/css/geek-lab.css" asp-append-version="true">
 </head>
-<body>
+<body class="lab-area">
     <nav class="navbar navbar-expand-lg sticky-top">
         <div class="container">
-            <a class="navbar-brand" href="@Url.Action("Index", "User")">GEEK-LAB</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <a class="navbar-brand" href="@Url.Action("Index", "User")">Geek Lab</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-label="Toggle shop navigation" aria-controls="navbarNav" aria-expanded="false">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
@@ -94,7 +95,7 @@
     </nav>
 
     <div class="container py-5">
-        <h1 class="fw-bold mb-4">Transaction History</h1>
+        <h1 class="fw-bold mb-4">Order history</h1>
 
         @if (Model != null && Model.Any())
         {
@@ -107,20 +108,20 @@
                 </div>
                 <div class="col-md-3">
                     <div class="stat-card">
-                        <div class="stat-value">RM @Model.Sum(t => t.Amount ?? 0).ToString("0.00")</div>
-                        <div class="text-muted small">Total Spent</div>
+                        <div class="stat-value">RM @Model.Sum(t => t.Amount ?? 0).ToString("N2")</div>
+                        <div class="text-muted small">Demo order total</div>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="stat-card">
-                        <div class="stat-value text-success">RM @Model.Sum(t => t.Promotion ?? 0).ToString("0.00")</div>
+                        <div class="stat-value text-success">RM @Model.Sum(t => t.Promotion ?? 0).ToString("N2")</div>
                         <div class="text-muted small">Total Saved</div>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="stat-card">
-                        <div class="stat-value">RM @((Model.Count > 0 ? Model.Sum(t => t.Amount ?? 0) / Model.Count : 0).ToString("0.00"))</div>
-                        <div class="text-muted small">Avg. Order</div>
+                        <div class="stat-value">RM @((Model.Count > 0 ? Model.Sum(t => t.Amount ?? 0) / Model.Count : 0).ToString("N2"))</div>
+                        <div class="text-muted small">Average order</div>
                     </div>
                 </div>
             </div>
@@ -140,7 +141,7 @@
                             </div>
                             <div class="text-end">
                                 <small class="text-muted d-block">@transaction.Description</small>
-                                <h4 class="text-primary fw-bold mb-0">RM @transaction.Amount?.ToString("0.00")</h4>
+                                <h4 class="text-primary fw-bold mb-0">RM @transaction.Amount?.ToString("N2")</h4>
                             </div>
                         </div>
                     </div>
@@ -148,24 +149,23 @@
                     <div class="row g-3">
                         <div class="col-md-3">
                             <small class="text-muted d-block">Subtotal</small>
-                            <strong>RM @transaction.SubtotalAmount?.ToString("0.00")</strong>
+                            <strong>RM @transaction.SubtotalAmount?.ToString("N2")</strong>
                         </div>
                         <div class="col-md-3">
                             <small class="text-muted d-block">GST (6%)</small>
-                            <strong>RM @transaction.GstAmount?.ToString("0.00")</strong>
+                            <strong>RM @transaction.GstAmount?.ToString("N2")</strong>
                         </div>
                         @if (transaction.Promotion > 0)
                         {
                             <div class="col-md-3">
                                 <small class="text-muted d-block">Promotion</small>
-                                <strong class="text-success">- RM @transaction.Promotion?.ToString("0.00")</strong>
+                                <strong class="text-success">- RM @transaction.Promotion?.ToString("N2")</strong>
                             </div>
                         }
                         <div class="col-md-3">
                             <small class="text-muted d-block">Payment</small>
                             <strong>
-                                <i class="fas fa-credit-card"></i>
-                                Processed securely
+                                No payment collected
                             </strong>
                         </div>
                     </div>
@@ -174,7 +174,7 @@
 
             <div class="text-center mt-4">
                 <button onclick="window.print()" class="btn btn-outline-primary">
-                    <i class="fas fa-print"></i> Print Receipts
+                    <i class="fas fa-print"></i> Print order summary
                 </button>
             </div>
         }

@@ -11,7 +11,8 @@
     <title>@ViewData["Title"] - Admin Portal</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="~/css/admin-modern.css" />
+    <link rel="stylesheet" href="~/css/geek-lab.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-modern.css" asp-append-version="true" />
     <style>
         .product-thumbnail {
             width: 50px;
@@ -74,7 +75,7 @@
                     <div class="sidebar-logo-icon">
                         <i class="fas fa-store"></i>
                     </div>
-                    <span class="sidebar-logo-text">E-Commerce</span>
+                    <span class="sidebar-logo-text">Geek Lab <small>Admin</small></span>
                 </a>
             </div>
 
@@ -89,7 +90,7 @@
                             </a>
                         </li>
                         <li class="sidebar-menu-item">
-                            <a href="@Url.Action("Index", "Admin")" class="sidebar-link active">
+                            <a href="@Url.Action("Index", "Admin")" class="sidebar-link active" aria-current="page">
                                 <i class="fas fa-box"></i>
                                 <span>Products</span>
                             </a>
@@ -138,13 +139,13 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="admin-main">
+        <main class="admin-main admin-inventory">
             <!-- Top Bar -->
             <div class="admin-topbar">
                 <div class="topbar-title">
                     <partial name="_AdminMenuButton" />
                     <i class="fas fa-box"></i>
-                    Product Management
+                    <h1>Product Management</h1>
                 </div>
                 <div class="topbar-actions">
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProductModal">
@@ -156,20 +157,27 @@
 
             <!-- Content -->
             <div class="admin-content">
-                <!-- Search & Filter -->
                 <div class="card mb-3">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center gap-3">
-                            <div class="search-box" style="max-width: 400px;">
-                                <i class="fas fa-search"></i>
-                                <input type="text" id="searchInput" aria-label="Search results" placeholder="Search products by name, description, seller...">
-                            </div>
-                            <div>
-                                <span class="badge badge-primary" id="productCount" style="font-size: 0.9375rem; padding: 0.5rem 1rem;">
-                                    Loading...
-                                </span>
+                    <div class="card-body inventory-filters">
+                        <div>
+                            <label for="searchInput">Search listings</label>
+                            <div class="search-box">
+                                <i class="fas fa-search" aria-hidden="true"></i>
+                                <input type="search" id="searchInput" placeholder="Product, description or seller" disabled>
                             </div>
                         </div>
+                        <div>
+                            <label for="productStatusFilter">Status</label>
+                            <select id="productStatusFilter" class="form-control" disabled>
+                                <option value="">All statuses</option>
+                                <option value="0">Active</option>
+                                <option value="1">Inactive</option>
+                                <option value="2">Pending</option>
+                                <option value="3">Suspended</option>
+                                <option value="4">Approved</option>
+                            </select>
+                        </div>
+                        <output class="badge badge-primary" id="productCount" for="searchInput productStatusFilter" aria-live="polite">Loading…</output>
                     </div>
                 </div>
 
@@ -179,23 +187,23 @@
                 <!-- Products Table -->
                 <div class="table-container">
                     <div class="table-responsive" tabindex="0" role="region" aria-label="Scrollable results">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Image</th>
-                                    <th>Name</th>
-                                    <th>Description</th>
-                                    <th>Price</th>
-                                    <th>Quantity</th>
-                                    <th>Seller</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
+                        <table class="data-table inventory-table" role="table">
+                            <thead role="rowgroup">
+                                <tr role="row">
+                                    <th scope="col" role="columnheader">ID</th>
+                                    <th scope="col" role="columnheader">Image</th>
+                                    <th scope="col" role="columnheader">Name</th>
+                                    <th scope="col" role="columnheader">Description</th>
+                                    <th scope="col" role="columnheader">Price</th>
+                                    <th scope="col" role="columnheader">Quantity</th>
+                                    <th scope="col" role="columnheader">Seller</th>
+                                    <th scope="col" role="columnheader">Status</th>
+                                    <th scope="col" role="columnheader">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="productsTableBody">
-                                <tr>
-                                    <td colspan="9" class="text-center" style="padding: 3rem;">
+                            <tbody id="productsTableBody" role="rowgroup">
+                                <tr role="row">
+                                    <td role="cell" colspan="9" class="text-center" style="padding: 3rem;">
                                         <div class="spinner" style="margin: 0 auto;"></div>
                                         <p style="margin-top: 1rem; color: #6b7280;">Loading products...</p>
                                     </td>
@@ -209,7 +217,7 @@
     </div>
 
     <!-- Create Product Modal -->
-    <div class="modal fade" id="createProductModal" tabindex="-1" style="display: none;">
+    <div class="modal fade" id="createProductModal" data-open-on-load="@(ViewData["OpenCreateProduct"] is true ? "true" : "false")" tabindex="-1" style="display: none;">
         <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
             <div class="modal-dialog" style="max-width: 700px;">
                 <div class="modal-header">
@@ -251,6 +259,7 @@
                                 <option value="1">Inactive</option>
                                 <option value="2">Pending</option>
                                 <option value="3">Suspended</option>
+                                <option value="4">Approved</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -314,6 +323,7 @@
                                 <option value="1">Inactive</option>
                                 <option value="2">Pending</option>
                                 <option value="3">Suspended</option>
+                                <option value="4">Approved</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -369,19 +379,8 @@
             loadProducts();
             loadSellers();
 
-            let searchTimeout;
-            $('#searchInput').on('keyup', function() {
-                clearTimeout(searchTimeout);
-                const searchTerm = $(this).val();
-
-                searchTimeout = setTimeout(function() {
-                    if (searchTerm.length > 0) {
-                        searchProducts(searchTerm);
-                    } else {
-                        renderProducts(allProducts);
-                    }
-                }, 300);
-            });
+            $('#searchInput').on('input', filterProducts);
+            $('#productStatusFilter').on('change', filterProducts);
 
             $('#productImages, #editProductImages').on('change', function() {
                 const container = $(this).next('.image-preview-container');
@@ -400,6 +399,8 @@
             $('[data-bs-dismiss="modal"]').on('click', function() {
                 $(this).closest('.modal').hide();
             });
+
+            $('#createProductModal[data-open-on-load="true"]').show();
         });
 
         function getStatusInfo(status) {
@@ -407,29 +408,32 @@
                 0: { text: 'Active', class: 'badge-success' },
                 1: { text: 'Inactive', class: 'badge-secondary' },
                 2: { text: 'Pending', class: 'badge-warning' },
-                3: { text: 'Suspended', class: 'badge-danger' }
+                3: { text: 'Suspended', class: 'badge-danger' },
+                4: { text: 'Approved', class: 'badge-success' }
             };
             return statusMap[status] || { text: 'Unknown', class: 'badge-secondary' };
         }
 
         function loadProducts() {
+            $('#searchInput, #productStatusFilter').prop('disabled', true);
             $.ajax({
                 url: '@Url.Action("GetProductsJson", "Admin")',
                 type: 'GET',
                 success: function(response) {
                     if (response.success) {
                         allProducts = response.data;
-                        renderProducts(allProducts);
+                        $('#searchInput, #productStatusFilter').prop('disabled', false);
+                        filterProducts();
                     } else {
                         showAlert('danger', response.message);
-                        $('#productsTableBody').html('<tr><td colspan="9" class="text-center">Failed to load products</td></tr>');
-                        $('#productCount').text('0 products');
+                        $('#productsTableBody').html('<tr role="row"><td role="cell" colspan="9" class="text-center">Failed to load products</td></tr>');
+                        $('#productCount').text('Unavailable');
                     }
                 },
                 error: function() {
                     showAlert('danger', 'Error loading products');
-                    $('#productsTableBody').html('<tr><td colspan="9" class="text-center">Error loading products</td></tr>');
-                    $('#productCount').text('0 products');
+                    $('#productsTableBody').html('<tr role="row"><td role="cell" colspan="9" class="text-center">Error loading products</td></tr>');
+                    $('#productCount').text('Unavailable');
                 }
             });
         }
@@ -456,7 +460,7 @@
             tbody.empty();
 
             if (products.length === 0) {
-                tbody.append('<tr><td colspan="9" class="text-center" style="padding: 2rem; color: #6b7280;">No products found</td></tr>');
+                tbody.append('<tr role="row"><td role="cell" colspan="9" class="text-center" style="padding: 2rem; color: #6b7280;">No products found</td></tr>');
                 $('#productCount').text('0 products');
                 return;
             }
@@ -465,20 +469,21 @@
 
             products.forEach(product => {
                 const statusInfo = getStatusInfo(product.productStatus);
+                const isActive = product.productStatus === 0 || product.productStatus === 4;
                 const imageUrl = product.imagePath ? product.imagePath.split(',')[0] : '';
                 const description = product.description ? (product.description.length > 50 ? product.description.substring(0, 50) + '...' : product.description) : 'N/A';
 
                 const row = `
-                    <tr>
-                        <td>${product.productID}</td>
-                        <td>${imageUrl ? `<img src="${escapeHtml(imageUrl)}" class="product-thumbnail" alt="${escapeHtml(product.productName)}">` : '<i class="fas fa-box" aria-label="No product image"></i>'}</td>
-                        <td><strong>${escapeHtml(product.productName || 'N/A')}</strong></td>
-                        <td>${escapeHtml(description)}</td>
-                        <td><strong style="color: #2563eb;">RM ${(product.unitPrice || 0).toFixed(2)}</strong></td>
-                        <td>${product.quantity || 0}</td>
-                        <td>${escapeHtml(product.sellerName)}</td>
-                        <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
-                        <td>
+                    <tr class="inventory-table-row" role="row">
+                        <td class="inventory-table-id" role="cell">${product.productID}</td>
+                        <td class="inventory-table-photo" role="cell">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" class="product-thumbnail" alt="">` : '<i class="fas fa-box" aria-label="No product image"></i>'}</td>
+                        <td class="inventory-table-name" role="cell"><strong>${escapeHtml(product.productName || 'N/A')}</strong></td>
+                        <td class="inventory-table-description" role="cell">${escapeHtml(description)}</td>
+                        <td class="inventory-table-price" role="cell"><strong class="inventory-amount">RM ${(product.unitPrice || 0).toFixed(2)}</strong></td>
+                        <td class="inventory-table-quantity" role="cell">${product.quantity || 0}<span class="inventory-mobile-stock"> in stock</span></td>
+                        <td class="inventory-table-seller" role="cell">${escapeHtml(product.sellerName)}</td>
+                        <td class="inventory-table-status" role="cell"><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                        <td class="inventory-table-actions" role="cell">
                             <div class="table-actions">
                                 <button class="btn btn-sm btn-icon btn-primary" onclick="viewDetails(${product.productID})" title="View">
                                     <i class="fas fa-eye"></i>
@@ -486,10 +491,10 @@
                                 <button class="btn btn-sm btn-icon btn-secondary" onclick="editProduct(${product.productID})" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-sm btn-icon ${product.productStatus === 0 ? 'btn-danger' : 'btn-success'}"
+                                <button class="btn btn-sm btn-icon ${isActive ? 'btn-secondary' : 'btn-success'}"
                                         onclick="toggleStatus(${product.productID}, ${product.productStatus})"
-                                        title="${product.productStatus === 0 ? 'Deactivate' : 'Activate'}">
-                                    <i class="fas fa-${product.productStatus === 0 ? 'ban' : 'check'}"></i>
+                                        title="${isActive ? 'Deactivate' : 'Activate'}">
+                                    <i class="fas fa-${isActive ? 'ban' : 'check'}"></i>
                                 </button>
                                 <button class="btn btn-sm btn-icon btn-danger" onclick="deleteProduct(${product.productID})" title="Delete">
                                     <i class="fas fa-trash"></i>
@@ -502,17 +507,14 @@
             });
         }
 
-        function searchProducts(searchTerm) {
-            $.ajax({
-                url: '@Url.Action("SearchProducts", "Admin")',
-                type: 'GET',
-                data: { searchTerm: searchTerm },
-                success: function(response) {
-                    if (response.success) {
-                        renderProducts(response.data);
-                    }
-                }
-            });
+        function filterProducts() {
+            const search = $('#searchInput').val().trim().toLowerCase();
+            const status = $('#productStatusFilter').val();
+            const matches = allProducts.filter(product =>
+                (status === '' || String(product.productStatus) === status) &&
+                [product.productName, product.description, product.sellerName]
+                    .some(value => (value || '').toLowerCase().includes(search)));
+            renderProducts(matches);
         }
 
         function saveProduct() {
@@ -667,7 +669,7 @@
         }
 
         function toggleStatus(productId, currentStatus) {
-            const newStatus = currentStatus === 0 ? 1 : 0;
+            const newStatus = currentStatus === 0 || currentStatus === 4 ? 1 : 0;
             const action = newStatus === 1 ? 'deactivate' : 'activate';
 
             if (!confirm(`Are you sure you want to ${action} this product?`)) {

@@ -1,5 +1,29 @@
 # Eduvo MVC verification
 
+## Checkout and repository review
+
+| Failure or gap | Cause and change | Evidence |
+| --- | --- | --- |
+| The order could record a different total from the one the Shopper reviewed. | The review rendered saved cart prices and a stored discount while submission read current prices and promotion eligibility. Checkout now saves the reviewed lines and discount with the session token and rechecks them inside the stock transaction. A change sends the Shopper back to review before any order or stock update. | Three MVC integration cases reproduced the failure and passed after the fix. They cover a changed price, changed quantity, and an expired promotion, with a successful confirmation at the revised total. |
+| Seller records could round independently and differ by a cent from checkout. | Round GST and discount once for the order, then allocate whole cents to the existing seller records. The final allocation includes any remaining cent. | The two-seller MVC case reproduced a fractional-cent total and now verifies that the records sum to RM 0.17 with RM 0.01 GST. SQL Server multi-seller rounding was not rerun. |
+| Cart quantity and remove failures were silent. | The Cart view now announces server and request errors through its alert region. It shows live listing prices, labels controls, and keeps the remove action available for unavailable items. | The .NET suite built the views and verified the cart and checkout HTTP routes. The updated cart controls still need a fresh browser interaction check. |
+| The old Admin product-create URL returned HTTP 500. | The old action asked MVC for a missing Razor view. It now uses the signed-in Admin product page and opens the existing Add Product form. | Chromium reproduced the HTTP 500 before the repair. The new MVC test verifies the fixed route renders the form and token and the normal list still starts with the form closed. The new auto-open behaviour was not rerun in Chromium. |
+
+The suite passed all **29 tests**. A separate read-only Chromium pass used the existing Codespace app on loopback. It confirmed all three sign-ins and loaded Admin product, seller and shopper management, Seller dashboard and inventory, and Shopper catalogue, cart, promotions and order history. That running app used an earlier build. The new checkout behaviour was exercised through the current MVC integration tests.
+
+## Portfolio interface and response hardening
+
+Chromium screenshots under [screenshots](screenshots) were captured on 18 November 2026 from the running MVC app, with a fresh database in the private SQL Server container. Desktop captures are 1,440 × 900 and phone captures are 390 × 844. The demo catalogue reuses product imagery from the existing coursework assets. The earlier README PNGs also matched the previous Chromium harness's raw output byte for byte.
+
+| Failure or gap | Cause and change | Evidence |
+| --- | --- | --- |
+| Admin search results could lose listing descriptions. On phones, the table hid status and action buttons off-screen. | The Admin search action returned a narrower projection than the listing action. The page now filters the full loaded results by text and status. Phone rows keep the product name, price, stock, status and actions together. | Chromium found the pending sample by its description and displayed that description in the result. The 390-pixel capture shows the status and row actions together. |
+| Seller inventory made stock and listing status hard to scan. | Replaced the photo-first grid with inventory rows and counts for shop-visible and pending listings. | In Chromium the Seller changed the pending sample from five to six units. The quantity persisted, and the Shopper saw six units after Admin activation. |
+| Catalogue feedback appeared far from the product and faded out. Checkout did little to distinguish the final total from the breakdown. | Added catalogue search, bounded quantity controls, persistent per-product feedback and a checkout summary that puts the total before the order action. | Chromium verified the search empty state, adjusted quantity, added a Steam Deck, applied `DEMO10`, placed the demo order, and confirmed RM 2,399.04 in order history. |
+| Authenticated pages and JSON could be stored by caches when an action supplied no cache directive. The application lacked explicit framing and MIME-sniffing headers. | Apply `Cache-Control: no-store` after authentication and add framing, MIME-sniffing and referrer protections. Static assets retain their own caching behavior. | The HTTP integration test checks authenticated HTML and JSON headers and verifies that CSS stays outside the no-store policy. Chromium also confirmed the Admin JSON headers. |
+
+Build completed with zero warnings and zero errors. The .NET suite passed all **24 tests**. This browser pass covered the listing and checkout paths above. Account recovery, SQL Server inventory contention, and accessibility beyond the targeted checks have their own evidence and limits below.
+
 ## 18 November 2026
 
 I verified the recovery in the Linux GitHub Codespace, with Chromium running against ASP.NET Core, SQL Server 2022, and Mailpit on loopback. The SQL Server and Mailpit containers were created for this check. All four repository migrations applied to the disposable database.
@@ -19,7 +43,7 @@ I verified the recovery in the Linux GitHub Codespace, with Chromium running aga
 - All three signed-in roles lost access to protected pages on logout.
 - The 19-test .NET suite passed. The automated shopper flow verifies an applied promotion, the recorded total, stock decrement, cart clearing, and one transaction after a repeat submission. These tests use EF Core’s in-memory provider. SQL Server concurrency is a separate verification item.
 
-Run the regression suite with `dotnet test Eduvo.Tests/Eduvo.Tests.csproj`. The browser checks above were run with a temporary local harness. No screenshots or recordings are included.
+Run the regression suite with `dotnet test Eduvo.Tests/Eduvo.Tests.csproj`. The browser checks in this section used a temporary local harness.
 
 ## Follow-up repairs and defensive review
 
@@ -43,20 +67,12 @@ The source review found EF Core LINQ queries throughout the reviewed request pat
 
 - This is a private demo. Review HTTPS and cookie deployment settings, distributed session and key storage, and database access before considering any public service.
 - Verification code limits are per challenge in the current session. Durable rate limiting, stricter account recovery controls, upload decoding and scanning, and dependency pinning remain open.
-- Broad concurrent load, every Admin AJAX failure branch, the unused legacy Admin CRUD URLs, and a full accessibility audit remain unverified. The interface review used Chromium at desktop and phone widths with targeted keyboard interaction.
-- The read-only audit and test results support the observed flows. No portfolio video has been recorded.
+- Several unlinked legacy Admin edit, delete, detail, and status routes still reference absent Razor views. The supported Admin flows use the modals and AJAX actions on the management pages. Broad concurrent load and full accessibility remain unverified. The interface review used Chromium at desktop and phone widths with targeted keyboard interaction.
+- NuGet reported no known advisories for the application’s direct or transitive packages from its configured source. Vendored jQuery Validation 1.19.5 is covered by an upstream advisory. The current Razor views have no references to that script, so the version match alone does not establish a reachable issue. [GitHub advisory](https://github.com/advisories/GHSA-rrj2-ph5q-jxw2)
+- The recording pass stopped before it produced a complete video. The screenshots remain the portfolio evidence.
 
 ### Recording storyboard
 
-Use a private Codespace and a clean disposable demo database with fictional accounts and product images. Rehearse before recording, and open Mailpit from the private Ports panel.
+The [demo guide](DEMO.md#record-the-walkthrough) lists the route, action, and timing for each shot. The [screenshot index](DEMO.md#screenshot-locations) links to the browser captures. The Shopper order-history capture shows the same SQL Server demo order at RM 2,399.04 and explicitly states that no payment was collected. The old receipt template displayed a generic payment confirmation even for simulated orders.
 
-| Segment | Show on screen |
-| --- | --- |
-| 0:00–0:20 | Introduce the 2025 DSE207 project and why it was revisited. Show the three roles and the original MVC structure. |
-| 0:20–0:55 | Sign in as Admin, open a listing, change its status, and show the refreshed row. Show the Seller Management status label. |
-| 0:55–1:30 | Sign in as Seller, create or edit a sample listing, and show the saved stock in Manage Products. |
-| 1:30–2:15 | As Shopper, add the listing to the cart, apply an assigned promotion, place a demo order, and show its transaction in order history. |
-| 2:15–2:45 | Use the password recovery form and Mailpit on a throwaway account. Pause or crop while entering the code and password. |
-| 2:45–3:15 | Show the test command and verified result. Close with the difference between the private coursework demo and a service ready for public use. |
-
-Capture the Admin product list, Seller product cards and Shopper checkout using sample data. Keep repository settings, Codespace URLs, passwords, verification codes, and any real email addresses out of the recording.
+The read-only demo check passed against the running app and Mailpit. The launcher refused to start against the occupied SQL port, and the existing Docker container IDs matched before and after. Shell checks with stubbed commands covered cleanup on normal exit and after Mailpit startup failure. A later isolated run used alternate loopback ports in the same Linux Codespace. The launcher created the disposable services, applied all four migrations, and passed `check-demo.sh`. The test launcher and its listeners were closed afterward. A default-port rerun was avoided because the existing demo still owned those ports.

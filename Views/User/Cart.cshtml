@@ -1,8 +1,10 @@
-﻿@model List<JQuery_ECommerceAss.Models.Cart>
+﻿@using JQuery_ECommerceAss.Common.Pricing
+@using JQuery_ECommerceAss.Common.Enum
+@model List<JQuery_ECommerceAss.Models.Cart>
 @{
     ViewData["Title"] = "Shopping Cart";
-    var username = Context.Session.GetString("Username");
-    var lastLogin = Context.Session.GetString("LastLogin");
+    var subtotal = CheckoutPricing.CalculateSubtotal(Model);
+    var gst = CheckoutPricing.RoundMoney(CheckoutPricing.CalculateGst(subtotal));
     Layout = null;
 }
 
@@ -99,19 +101,20 @@
                 background: #764ba2;
             }
     </style>
+    <link rel="stylesheet" href="~/css/geek-lab.css" asp-append-version="true">
 </head>
-<body>
+<body class="lab-area">
     <nav class="navbar navbar-expand-lg sticky-top">
         <div class="container">
-            <a class="navbar-brand" href="@Url.Action("Index", "User")">GEEK-LAB</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <a class="navbar-brand" href="@Url.Action("Index", "User")">Geek Lab</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-label="Toggle shop navigation" aria-controls="navbarNav" aria-expanded="false">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("Index", "User")"><i class="fas fa-home"></i> Home</a></li>
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("Products", "User")"><i class="fas fa-shopping-bag"></i> Products</a></li>
-                    <li class="nav-item"><a class="nav-link active" href="@Url.Action("Cart", "User")"><i class="fas fa-shopping-cart"></i> Cart</a></li>
+                    <li class="nav-item"><a class="nav-link active" aria-current="page" href="@Url.Action("Cart", "User")"><i class="fas fa-shopping-cart"></i> Cart</a></li>
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("MyPromotions", "User")"><i class="fas fa-tags"></i> Promotions</a></li>
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("Profile", "User")"><i class="fas fa-user"></i> Profile</a></li>
                     <li class="nav-item"><form asp-controller="User" asp-action="Logout" method="post"><button type="submit" class="nav-link border-0 bg-transparent"><i class="fas fa-sign-out-alt"></i> Logout</button></form></li>
@@ -133,7 +136,7 @@
         }
 
 
-        <div id="alertContainer"></div>
+        <p id="cart-error" class="alert alert-danger" role="alert" hidden></p>
 
         @if (Model != null && Model.Any())
         {
@@ -141,6 +144,8 @@
                 <div class="col-lg-8">
                     @foreach (var item in Model)
                     {
+                        var name = item.Product?.ProductName ?? "Unavailable item";
+                        var available = item.Product is { ProductStatus: Status.Active or Status.Approve, UnitPrice: >= 0, Quantity: > 0, SellerID: not null };
                         <div class="cart-item" data-cart-id="@item.CartID">
                             <div class="row align-items-center">
                                 <div class="col-md-2">
@@ -156,16 +161,18 @@
                                     }
                                 </div>
                                 <div class="col-md-4">
-                                    <h5 class="fw-semibold mb-1">@item.Product?.ProductName</h5>
-                                    <p class="text-muted mb-0" data-unit-price="@item.Price">RM @item.Price?.ToString("0.00")</p>
+                                    <h5 class="fw-semibold mb-1">@name</h5>
+                                    <p class="text-muted mb-0" data-unit-price="@((item.Price ?? 0m).ToString(System.Globalization.CultureInfo.InvariantCulture))">
+                                        @(available ? $"RM {item.Price:N2}" : "Unavailable")
+                                    </p>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="d-flex align-items-center gap-2">
-                                        <button class="qty-btn" onclick="changeQty(@item.CartID, -1, @item.Product?.Quantity)">
+                                        <button type="button" class="qty-btn" aria-label="Decrease quantity for @name" disabled="@(!available)" onclick="changeQty(@item.CartID, -1, @(item.Product?.Quantity ?? 0))">
                                             <i class="fas fa-minus"></i>
                                         </button>
                                         <span class="qty-display" id="qty-@item.CartID">@item.Quantity</span>
-                                        <button class="qty-btn" onclick="changeQty(@item.CartID, 1, @item.Product?.Quantity)">
+                                        <button type="button" class="qty-btn" aria-label="Increase quantity for @name" disabled="@(!available)" onclick="changeQty(@item.CartID, 1, @(item.Product?.Quantity ?? 0))">
                                             <i class="fas fa-plus"></i>
                                         </button>
                                     </div>
@@ -176,7 +183,7 @@
                                     </h5>
                                 </div>
                                 <div class="col-md-1 text-end">
-                                    <button class="btn btn-sm btn-outline-danger" onclick="removeItem(@item.CartID)">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" aria-label="Remove @name" onclick="removeItem(@item.CartID)">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
@@ -189,16 +196,16 @@
                         <h4 class="fw-bold mb-4">Order Summary</h4>
                         <div class="d-flex justify-content-between mb-2">
                             <span>Subtotal:</span>
-                            <span id="subtotal">RM @Model.Sum(i => (i.Price ?? 0) * (i.Quantity ?? 0)).ToString("0.00")</span>
+                            <span id="subtotal">RM @subtotal.ToString("0.00")</span>
                         </div>
                         <div class="d-flex justify-content-between mb-3">
                             <span>GST (6%):</span>
-                            <span id="gst">RM @((Model.Sum(i => (i.Price ?? 0) * (i.Quantity ?? 0)) * 0.06m).ToString("0.00"))</span>
+                            <span id="gst">RM @gst.ToString("0.00")</span>
                         </div>
                         <hr>
                         <div class="d-flex justify-content-between mb-4">
                             <h5 class="fw-bold">Total:</h5>
-                            <h5 class="fw-bold text-primary" id="total">RM @((Model.Sum(i => (i.Price ?? 0) * (i.Quantity ?? 0)) * 1.06m).ToString("0.00"))</h5>
+                            <h5 class="fw-bold text-primary" id="total">RM @((subtotal + gst).ToString("0.00"))</h5>
                         </div>
                         <a href="@Url.Action("Checkout", "User")" class="btn-checkout mb-2">
                             Proceed to Checkout <i class="fas fa-arrow-right ms-2"></i>
@@ -226,23 +233,39 @@
     <script src="~/js/session-guard.js"></script>
     <partial name="_AntiforgeryHeader" />
     <script>
+        function showCartError(message) {
+            $('#cart-error').text(message).prop('hidden', !message);
+        }
+
         function changeQty(cartId, change, maxQty) {
             const qtyEl = $(`#qty-${cartId}`);
-            let newQty = parseInt(qtyEl.text()) + change;
-            if (newQty < 1 || newQty > maxQty) return;
+            const newQty = Number(qtyEl.text().trim()) + change;
+            if (newQty < 1) return;
+            if (newQty > maxQty && change > 0) {
+                showCartError(`Only ${maxQty} items available in stock.`);
+                return;
+            }
+            const row = qtyEl.closest('.cart-item');
+            const controls = row.find('.qty-btn');
+            controls.prop('disabled', true);
 
             $.ajax({
                 url: '@Url.Action("UpdateCartQuantityAjax", "User")',
                 type: 'POST',
                 data: { cartId: cartId, quantity: newQty },
                 success: function(response) {
-                    if (response.success) {
-                        qtyEl.text(newQty);
-                        const unitPrice = parseFloat($(`.cart-item[data-cart-id="${cartId}"]`).find('[data-unit-price]').data('unit-price'));
-                        $(`#total-${cartId}`).text('RM ' + (unitPrice * newQty).toFixed(2));
-                        updateSummary();
+                    if (!response.success) {
+                        showCartError(response.message || 'Could not update this item.');
+                        return;
                     }
-                }
+                    showCartError('');
+                    qtyEl.text(newQty);
+                    const unitCents = Math.round(Number(row.find('[data-unit-price]').data('unit-price')) * 100);
+                    $(`#total-${cartId}`).text('RM ' + (unitCents * newQty / 100).toFixed(2));
+                    updateSummary();
+                },
+                error: () => showCartError('Could not update this item. Try again.'),
+                complete: () => controls.prop('disabled', false)
             });
         }
 
@@ -250,14 +273,14 @@
             let subtotal = 0;
             $('.cart-item').each(function() {
                 const id = $(this).data('cart-id');
-                const qty = parseInt($(`#qty-${id}`).text());
-                const price = parseFloat($(this).find('[data-unit-price]').data('unit-price'));
-                subtotal += qty * price;
+                const qty = Number($(`#qty-${id}`).text().trim());
+                const unitCents = Math.round(Number($(this).find('[data-unit-price]').data('unit-price')) * 100);
+                subtotal += qty * unitCents;
             });
-            const gst = subtotal * 0.06;
-            $('#subtotal').text('RM ' + subtotal.toFixed(2));
-            $('#gst').text('RM ' + gst.toFixed(2));
-            $('#total').text('RM ' + (subtotal + gst).toFixed(2));
+            const gst = Math.round(subtotal * 0.06);
+            $('#subtotal').text('RM ' + (subtotal / 100).toFixed(2));
+            $('#gst').text('RM ' + (gst / 100).toFixed(2));
+            $('#total').text('RM ' + ((subtotal + gst) / 100).toFixed(2));
         }
 
         function removeItem(cartId) {
@@ -268,7 +291,9 @@
                 data: { cartId: cartId },
                 success: function(response) {
                     if (response.success) location.reload();
-                }
+                    else showCartError(response.message || 'Could not remove this item.');
+                },
+                error: () => showCartError('Could not remove this item. Try again.')
             });
         }
     </script>

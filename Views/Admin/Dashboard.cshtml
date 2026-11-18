@@ -11,7 +11,8 @@
     <title>@ViewData["Title"] - Admin Portal</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="~/css/admin-modern.css" />
+    <link rel="stylesheet" href="~/css/geek-lab.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-modern.css" asp-append-version="true" />
 </head>
 <body>
     <div class="admin-layout">
@@ -25,7 +26,7 @@
                     <div class="sidebar-logo-icon">
                         <i class="fas fa-store"></i>
                     </div>
-                    <span class="sidebar-logo-text">E-Commerce</span>
+                    <span class="sidebar-logo-text">Geek Lab <small>Admin</small></span>
                 </a>
             </div>
 
@@ -34,7 +35,7 @@
                     <h6 class="sidebar-section-title">Main Menu</h6>
                     <ul class="sidebar-menu">
                         <li class="sidebar-menu-item">
-                            <a href="@Url.Action("Dashboard", "Admin")" class="sidebar-link active">
+                            <a href="@Url.Action("Dashboard", "Admin")" class="sidebar-link active" aria-current="page">
                                 <i class="fas fa-chart-line"></i>
                                 <span>Dashboard</span>
                             </a>

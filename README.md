@@ -1,45 +1,48 @@
-# Eduvo E-Commerce
+# Geek Lab · Eduvo E-Commerce
 
 **Chin Yi Zhe · Eduvo Academy · DSE207 coursework, 2025**
 
-I built this shop for class in 2025 and came back to it in 2026 while looking for an internship. By then I could have generated a fresh portfolio project in an afternoon. I wanted to get better at fixing the one I already had.
+I built this shop for class in 2025 and came back to it in 2026 while looking for an internship. By then I could have generated a fresh portfolio project in an afternoon. I wanted to get better at fixing the one I already had. Geek Lab is the shop name. Yeezy Labs was the inside joke.
 
 The app built, but **Add Product** and **Checkout** both crashed. Fixing those clicks meant finding the missing pages, following the requests through the controllers, and testing them with a real database.
 
-![Shopper checkout showing a discount and the final demo order total](docs/screenshots/shopper-checkout.png)
+![Geek Lab catalogue with search, stock counts and quantity controls](docs/screenshots/shopper-catalogue.png)
 
-*Checkout with a sample promotion applied. This is a demo order, so there are no card fields.*
+*Captured in Chromium from the running ASP.NET Core MVC app with a disposable SQL Server database and sample listings.*
 
-## Follow one listing through the shop
+## See the app in action
 
 | Who | What to try |
 | --- | --- |
-| **Seller** | Add a listing, set its price and stock, and see it marked as pending. [See Manage Products](docs/screenshots/seller-products.png) |
-| **Admin** | Activate the listing so it appears in the shop. The same area handles seller and shopper accounts. [See Product Management](docs/screenshots/admin-products.png) · [Phone view](docs/screenshots/admin-mobile.png) |
-| **Shopper** | Add the item to the cart, apply an assigned promotion, and find the demo order in order history. Registration and password reset codes go to Mailpit. |
+| **Seller** | Edit the stock on the pending Demo Laptop listing and see the saved quantity. [Seller inventory](docs/screenshots/seller-products.png) |
+| **Admin** | Filter to pending listings and activate the Demo Laptop so shoppers can see it. [Product management](docs/screenshots/admin-products.png) · [Phone view](docs/screenshots/admin-mobile.png) |
+| **Shopper** | Find the activated listing in the catalogue. To try checkout, add one Steam Deck, apply `DEMO10`, then find the RM 2,399.04 order in order history. [Checkout](docs/screenshots/shopper-checkout.png) · [Phone view](docs/screenshots/shopper-mobile.png) · [Order history](docs/screenshots/shopper-order-history.png) |
 
-## The bit I’m proud of
+## What I learned from the last unit
 
 My favorite check was two shoppers trying to buy the last unit. In SQL Server, one order went through, the other shopper landed back in the cart, and the listing ended up with zero stock. The recovered checkout read inventory before the transaction started. Moving the read into the transaction and handling the conflict meant the second shopper got a useful response.
 
-The recovery and hardening work passed **23 automated tests**. Those tests use EF Core’s in-memory provider. I also ran the three roles in Chromium against SQL Server and Mailpit. [See what passed and what still needs work](docs/VERIFICATION.md)
+The current suite passes **29 automated tests**. The MVC integration tests use EF Core’s in-memory provider and verify that a changed price, quantity, or promotion requires another review. A separate Chromium run against SQL Server confirmed that a seller’s stock edit reaches the catalogue after Admin activation and that checkout records the discounted total. [Verification notes and known limits](docs/VERIFICATION.md)
 
 ## Run it yourself
 
-You’ll need a .NET SDK that can target .NET 8, the .NET 8 runtime, and Docker for the full demo. From the repo root:
+With Docker, Bash, Python 3, curl, a .NET SDK that can target .NET 8, and the .NET 8 runtime, clone the repo and run this from its root:
 
 ```bash
-dotnet restore Eduvo.Tests/Eduvo.Tests.csproj
-dotnet build JQuery-ECommerceAss.csproj --no-restore
-dotnet test Eduvo.Tests/Eduvo.Tests.csproj --no-restore
+./scripts/start-demo.sh
 ```
 
-In a fresh disposable environment, run `./scripts/start-demo.sh` to start SQL Server and Mailpit, apply the migrations, and seed sample accounts. The terminal prints the sign-in details. In a Codespace, keep the forwarded ports private. If you already have a demo database you want to keep using, check `docker ps -a` before starting a fresh demo.
+That's the original one-command idea. It starts SQL Server and Mailpit, applies migrations, seeds the shop, and starts the app. Use the sample accounts from the launcher and keep forwarded Codespace ports private. The [demo guide](docs/DEMO.md) covers the browser walkthrough and running beside an existing demo.
 
-## Where to look in the code
+To check a running demo or test your own changes:
 
-- [Views](Views) holds the Razor pages. [Controllers](Controllers) handles the requests from each role.
-- [AppDbContext](Data/AppDbContext.cs) maps the application data to SQL Server through EF Core. [CheckoutPricing](Common/Pricing/CheckoutPricing.cs) works out the subtotal, tax, and discount on the server.
-- [Integration tests](Eduvo.Tests/IntegrationSmokeTests.cs) go through real MVC routes. [Modernization notes](docs/MODERNIZATION-NOTES.md) compare the original coursework with the earlier recovery.
+```bash
+./scripts/check-demo.sh
+dotnet test Eduvo.Tests/Eduvo.Tests.csproj
+```
 
-This is still a coursework demo. It uses an in-process session, some assets come from CDNs, and uploads are checked by size and signature. [Known limits](docs/VERIFICATION.md#remaining-work) · [Demo recording outline](docs/VERIFICATION.md#recording-storyboard)
+## Code and project direction
+
+The [project map](docs/PROJECT-MAP.md) follows a listing from Seller inventory to Admin review and Shopper checkout, with links to the Razor views, controller actions, and pricing code. It also maps where I could take the project next, including listing history and clearer feedback when price or stock changes.
+
+This is a coursework demo. It uses an in-process session, some assets come from CDNs, and uploads are checked by size and signature. [Known limits](docs/VERIFICATION.md#remaining-work)

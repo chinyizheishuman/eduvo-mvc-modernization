@@ -1139,3 +1139,174 @@ textarea.form-control {
         grid-template-columns: 1fr;
     }
 }
+
+/* Shared Geek Lab identity and the product filters. */
+.admin-layout {
+    --primary-blue: var(--lab-accent);
+    --primary-blue-hover: var(--lab-accent-hover);
+    --sidebar-active-bg: var(--lab-tint);
+    --gray-50: var(--lab-surface);
+}
+
+.sidebar-header {
+    background: var(--lab-navy);
+}
+
+.sidebar-logo-text small {
+    display: block;
+    color: #d5e2ee;
+    font-size: .75rem;
+    font-weight: 500;
+    letter-spacing: 0;
+}
+
+.topbar-title h1 {
+    font: inherit;
+    margin: 0;
+}
+
+.inventory-amount {
+    color: var(--lab-accent);
+}
+
+.inventory-filters {
+    align-items: end;
+    display: grid;
+    gap: .75rem 1rem;
+    grid-template-columns: minmax(12rem, 25rem) minmax(8rem, 12rem) auto;
+}
+
+.inventory-filters label {
+    color: var(--lab-muted);
+    display: block;
+    font-size: .82rem;
+    font-weight: 700;
+    margin-bottom: .35rem;
+}
+
+.inventory-filters .search-box,
+.inventory-filters .form-control {
+    width: 100%;
+}
+
+.inventory-filters output {
+    align-self: end;
+    background: var(--lab-tint);
+    color: var(--lab-accent);
+    justify-self: end;
+    margin-bottom: .25rem;
+}
+
+@media (max-width: 650px) {
+    .inventory-filters {
+        align-items: end;
+        grid-template-columns: minmax(8rem, 1fr) auto;
+    }
+
+    .inventory-filters > :first-child {
+        grid-column: 1 / -1;
+    }
+}
+
+.admin-layout {
+    --sidebar-active: var(--lab-accent);
+}
+
+.inventory-amount {
+    white-space: nowrap;
+}
+
+.inventory-mobile-stock {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .admin-inventory .table-container {
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+    }
+
+    .admin-inventory .table-responsive {
+        overflow: visible;
+    }
+
+    .inventory-table,
+    .inventory-table tbody {
+        display: block;
+    }
+
+    .inventory-table thead {
+        clip-path: inset(50%);
+        height: 1px;
+        overflow: hidden;
+        position: absolute;
+        width: 1px;
+    }
+
+    .inventory-table-row {
+        align-items: center;
+        background: white;
+        border: 1px solid var(--lab-line);
+        border-radius: .75rem;
+        display: grid;
+        gap: .5rem;
+        grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+        margin-bottom: .65rem;
+        padding: .7rem;
+    }
+
+    .inventory-table-row td {
+        border: 0;
+        padding: 0;
+    }
+
+    .inventory-table-row :is(.inventory-table-id, .inventory-table-description, .inventory-table-seller) {
+        display: none;
+    }
+
+    .inventory-table-photo {
+        grid-row: 1 / span 2;
+    }
+
+    .inventory-table-photo .product-thumbnail {
+        display: block;
+        height: 2.75rem;
+        width: 2.75rem;
+    }
+
+    .inventory-table-name {
+        grid-column: 2;
+        overflow-wrap: anywhere;
+    }
+
+    .inventory-table-price {
+        grid-column: 2;
+        grid-row: 2;
+    }
+
+    .inventory-table-quantity {
+        grid-column: 3;
+        grid-row: 2;
+        white-space: nowrap;
+    }
+
+    .inventory-mobile-stock {
+        display: inline;
+    }
+
+    .inventory-table-status {
+        grid-column: 3;
+        grid-row: 1;
+    }
+
+    .inventory-table-actions {
+        grid-column: 2 / -1;
+        grid-row: 3;
+    }
+
+    .inventory-table-actions .btn-icon {
+        min-height: 40px;
+        min-width: 40px;
+    }
+}

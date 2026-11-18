@@ -123,9 +123,16 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         //===========================================================================================
-        public IActionResult ProductCreateForm() //Product Create Form Add Upload Multiple Photos Function 
+        [HttpGet]
+        public IActionResult ProductCreateForm()
         {
-            return View();
+            if (!IsAdminLoggedIn())
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
+            ViewData["OpenCreateProduct"] = true;
+            return View(nameof(Index));
         }
 
         //===========================================================================================

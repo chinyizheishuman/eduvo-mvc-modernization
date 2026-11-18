@@ -15,6 +15,8 @@ public static class CheckoutPricing
         return subtotal * 0.06m;
     }
 
+    public static decimal RoundMoney(decimal amount) => Math.Round(amount, 2, MidpointRounding.AwayFromZero);
+
     public static decimal CalculatePromotion(
         decimal subtotal,
         Promotion? promotion,

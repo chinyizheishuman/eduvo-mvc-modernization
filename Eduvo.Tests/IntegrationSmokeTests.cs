@@ -184,6 +184,28 @@ public class IntegrationSmokeTests : IClassFixture<SmokeTestFactory>
         Assert.Equal(HttpStatusCode.OK, follow.StatusCode);
     }
 
+    [Fact]
+    public async Task PrivatePagesAndJson_AreNotStoredAndCannotBeFramed()
+    {
+        using var client = CreateClient();
+        await SignInAdminAsync(client);
+
+        foreach (var route in new[] { "/Admin/Index", "/Admin/GetProductsJson" })
+        {
+            using var response = await client.GetAsync(route);
+            response.EnsureSuccessStatusCode();
+            Assert.True(response.Headers.CacheControl?.NoStore);
+            Assert.Equal("DENY", Assert.Single(response.Headers.GetValues("X-Frame-Options")));
+            Assert.Equal("nosniff", Assert.Single(response.Headers.GetValues("X-Content-Type-Options")));
+            Assert.Equal("strict-origin-when-cross-origin",
+                Assert.Single(response.Headers.GetValues("Referrer-Policy")));
+        }
+
+        using var css = await client.GetAsync("/css/admin-modern.css");
+        css.EnsureSuccessStatusCode();
+        Assert.NotEqual(true, css.Headers.CacheControl?.NoStore);
+    }
+
     [Theory]
     [InlineData("Index", "UpdateProductStatusAjax")]
     [InlineData("ManageUser", "UpdateUserStatusAjax")]
@@ -228,6 +250,20 @@ public class IntegrationSmokeTests : IClassFixture<SmokeTestFactory>
             "ManageUser" => db.Users.Single(u => u.UserID == id).UserStatus,
             _ => db.Sellers.Single(s => s.SellerID == id).SellerStatus
         }));
+    }
+
+    [Fact]
+    public async Task AdminLegacyProductCreate_ReusesTheSupportedProductForm()
+    {
+        using var client = CreateClient();
+        await SignInAdminAsync(client);
+
+        var page = await client.GetStringAsync("/Admin/ProductCreateForm");
+        Assert.Contains("id=\"createProductForm\"", page);
+        Assert.Contains("id=\"createProductModal\" data-open-on-load=\"true\"", page);
+        Assert.NotEmpty(await GetAsync(page, "__RequestVerificationToken"));
+        Assert.Contains("id=\"createProductModal\" data-open-on-load=\"false\"",
+            await client.GetStringAsync("/Admin/Index"));
     }
 
     [Fact]
@@ -410,6 +446,136 @@ public class IntegrationSmokeTests : IClassFixture<SmokeTestFactory>
             }));
         Assert.Equal(HttpStatusCode.Redirect, delete.StatusCode);
         Assert.False(_factory.Observe(db => db.Products.Any(p => p.ProductID == accounts.ProductId)));
+    }
+
+    private async Task SignInShopperAsync(HttpClient client)
+    {
+        var loginPage = await client.GetStringAsync("/User/Login");
+        Assert.True(await PostFormAsync(client, "/User/Login", new()
+        {
+            ["Username"] = $"smoke-user-{Run}", ["UserPassword"] = "Smoke123!",
+            ["__RequestVerificationToken"] = await GetAsync(loginPage, "__RequestVerificationToken")
+        }));
+    }
+
+    [Theory]
+    [InlineData("price", "RM 63.60")]
+    [InlineData("quantity", "RM 106.00")]
+    [InlineData("promotion", "RM 53.00")]
+    public async Task Checkout_RequiresReviewWhenOrderChanges(string change, string revisedTotal)
+    {
+        var accounts = SeedAccounts();
+        var promoCode = $"REVIEW-{Run}";
+        _factory.Seed(db =>
+        {
+            db.Carts.Add(new Cart
+            {
+                UserID = accounts.UserId, ProductID = accounts.ProductId, Quantity = 1, Price = 50m
+            });
+            if (change == "promotion")
+            {
+                db.Promotions.Add(new Promotion
+                {
+                    PromotionCode = promoCode, PromotionStatus = Status.Active, DiscountPercentage = 10m,
+                    StartDate = DateTime.Now.AddDays(-1)
+                });
+            }
+        });
+
+        using var client = CreateClient();
+        await SignInShopperAsync(client);
+
+        var checkoutHtml = await client.GetStringAsync("/User/Checkout");
+        if (change == "promotion")
+        {
+            var apply = await client.PostAsync("/User/ApplyPromoCode", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["promoCode"] = promoCode,
+                ["__RequestVerificationToken"] = await GetAsync(checkoutHtml, "__RequestVerificationToken")
+            }));
+            Assert.Equal(HttpStatusCode.Redirect, apply.StatusCode);
+            checkoutHtml = await client.GetStringAsync("/User/Checkout");
+            Assert.Contains("RM 48.00", checkoutHtml);
+        }
+
+        _factory.Seed(db =>
+        {
+            switch (change)
+            {
+                case "price":
+                    db.Products.Find(accounts.ProductId)!.UnitPrice = 60m;
+                    break;
+                case "quantity":
+                    db.Carts.Single(item => item.UserID == accounts.UserId).Quantity = 2;
+                    break;
+                case "promotion":
+                    db.Promotions.Single(promotion => promotion.PromotionCode == promoCode).EndDate = DateTime.Now.AddSeconds(-1);
+                    break;
+            }
+        });
+        var stockBefore = _factory.Observe(db => db.Products.Find(accounts.ProductId)!.Quantity);
+
+        var submitted = await client.PostAsync("/User/ProcessPayment", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["checkoutToken"] = await GetAsync(checkoutHtml, "checkoutToken"),
+            ["__RequestVerificationToken"] = await GetAsync(checkoutHtml, "__RequestVerificationToken")
+        }));
+
+        Assert.Equal(HttpStatusCode.Redirect, submitted.StatusCode);
+        Assert.Equal("/User/Checkout", submitted.Headers.Location?.OriginalString);
+        Assert.False(_factory.Observe(db => db.TransactionHis.Any(t => t.UserID == accounts.UserId)));
+        Assert.False(_factory.Observe(db => db.CheckoutAttempts.Any(t => t.UserID == accounts.UserId)));
+        Assert.True(_factory.Observe(db => db.Carts.Any(item => item.UserID == accounts.UserId)));
+        Assert.Equal(stockBefore, _factory.Observe(db => db.Products.Find(accounts.ProductId)!.Quantity));
+
+        var review = await client.GetStringAsync("/User/Checkout");
+        Assert.Contains("Your order changed. Review the updated order before placing it.", review);
+        Assert.Contains(revisedTotal, review);
+
+        var confirmed = await client.PostAsync("/User/ProcessPayment", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["checkoutToken"] = await GetAsync(review, "checkoutToken"),
+            ["__RequestVerificationToken"] = await GetAsync(review, "__RequestVerificationToken")
+        }));
+        Assert.Equal("/User/Index", confirmed.Headers.Location?.OriginalString);
+        Assert.Contains(revisedTotal, await client.GetStringAsync("/User/TransactionHistory"));
+        Assert.Equal(1, _factory.Observe(db => db.TransactionHis.Count(t => t.UserID == accounts.UserId)));
+    }
+
+    [Fact]
+    public async Task Checkout_AllocatesWholeCentsAcrossSellers()
+    {
+        var accounts = SeedAccounts();
+        _factory.Seed(db =>
+        {
+            var product = db.Products.Find(accounts.ProductId)!;
+            product.UnitPrice = 0.08m;
+            var secondProduct = new Product
+            {
+                ProductName = $"Second listing {Run}", UnitPrice = 0.08m, Quantity = 5,
+                ProductStatus = Status.Active, Seller = new Seller { SellerUsername = $"second-seller-{Run}" }
+            };
+            db.Carts.AddRange(
+                new Cart { UserID = accounts.UserId, Product = product, Price = 0.08m, Quantity = 1 },
+                new Cart { UserID = accounts.UserId, Product = secondProduct, Price = 0.08m, Quantity = 1 });
+        });
+
+        using var client = CreateClient();
+        await SignInShopperAsync(client);
+        var page = await client.GetStringAsync("/User/Checkout");
+        Assert.Contains("RM 0.17", page);
+        var result = await client.PostAsync("/User/ProcessPayment", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["checkoutToken"] = await GetAsync(page, "checkoutToken"),
+            ["__RequestVerificationToken"] = await GetAsync(page, "__RequestVerificationToken")
+        }));
+
+        Assert.Equal("/User/Index", result.Headers.Location?.OriginalString);
+        var records = _factory.Observe(db => db.TransactionHis.Where(record => record.UserID == accounts.UserId).ToList());
+        Assert.Equal(2, records.Count);
+        Assert.Equal(0.17m, records.Sum(record => record.Amount));
+        Assert.Equal(0.01m, records.Sum(record => record.GstAmount));
+        Assert.All(records, record => Assert.Equal(record.Amount, Math.Round(record.Amount!.Value, 2)));
     }
 
     [Fact]

@@ -436,10 +436,12 @@ namespace JQuery_ECommerceAss.Controllers
 
             var userId = Convert.ToInt32(HttpContext.Session.GetString("LoginUser"));
             var cartItems = db.Carts
+                .AsNoTracking()
                 .Include(c => c.Product)
                 .Where(c => c.UserID == userId)
                 .ToList();
 
+            UseCurrentPrices(cartItems);
             return View(cartItems);
         }
 
@@ -618,6 +620,7 @@ namespace JQuery_ECommerceAss.Controllers
 
             var userId = Convert.ToInt32(HttpContext.Session.GetString("LoginUser"));
             var cartItems = db.Carts
+                .AsNoTracking()
                 .Include(c => c.Product)
                 .Where(c => c.UserID == userId)
                 .ToList();
@@ -628,20 +631,27 @@ namespace JQuery_ECommerceAss.Controllers
                 return RedirectToAction(nameof(Cart));
             }
 
-            var promoCode = HttpContext.Session.GetString("AppliedPromoCode");
-            var promoDiscountStr = HttpContext.Session.GetString("PromotionDiscount");
-
-            decimal promoDiscount = 0;
-            if (!string.IsNullOrEmpty(promoDiscountStr))
+            if (cartItems.Any(item => !IsAvailableForPurchase(item.Product) || item.Product.SellerID == null))
             {
-                decimal.TryParse(promoDiscountStr, out promoDiscount);
+                TempData["Error"] = "Remove unavailable items from your cart before placing an order.";
+                return RedirectToAction(nameof(Cart));
             }
 
-            ViewBag.AppliedPromoCode = promoCode;
-            ViewBag.PromotionDiscount = promoDiscount;
-            var checkoutToken = Guid.NewGuid().ToString("N");
-            HttpContext.Session.SetString("CheckoutToken", checkoutToken);
-            ViewBag.CheckoutToken = checkoutToken;
+            UseCurrentPrices(cartItems);
+            var promotion = FindCheckoutPromotion(userId);
+            var discount = CalculateCheckoutDiscount(CheckoutPricing.CalculateSubtotal(cartItems), promotion);
+            if (discount == 0m && HttpContext.Session.GetInt32("UserPromotionID").HasValue)
+            {
+                HttpContext.Session.Remove("UserPromotionID");
+                promotion = null;
+            }
+
+            var review = new CheckoutReview(Guid.NewGuid().ToString("N"), ReviewLines(cartItems),
+                promotion?.UserPromotionID, discount);
+            HttpContext.Session.SetString(nameof(CheckoutReview), JsonSerializer.Serialize(review));
+            ViewBag.CheckoutToken = review.Token;
+            ViewBag.AppliedPromoCode = promotion?.Promotion?.PromotionCode;
+            ViewBag.PromotionDiscount = review.Discount;
 
             return View(cartItems);
         }
@@ -655,9 +665,9 @@ namespace JQuery_ECommerceAss.Controllers
                 return RedirectToAction(nameof(Login));
             }
 
-            var expectedCheckoutToken = HttpContext.Session.GetString("CheckoutToken");
-            if (string.IsNullOrEmpty(expectedCheckoutToken) ||
-                !string.Equals(expectedCheckoutToken, checkoutToken, StringComparison.Ordinal))
+            var storedReview = HttpContext.Session.GetString(nameof(CheckoutReview));
+            var review = storedReview is null ? null : JsonSerializer.Deserialize<CheckoutReview>(storedReview);
+            if (review is null || !string.Equals(review.Token, checkoutToken, StringComparison.Ordinal))
             {
                 TempData["Error"] = "This checkout request has expired. Please reload checkout and try again.";
                 return RedirectToAction(nameof(Checkout));
@@ -666,7 +676,7 @@ namespace JQuery_ECommerceAss.Controllers
             var userId = Convert.ToInt32(HttpContext.Session.GetString("LoginUser"));
             try
             {
-                return CompleteCheckout(userId, checkoutToken);
+                return CompleteCheckout(userId, review);
             }
             catch (Exception exception) when (IsCheckoutConflict(exception))
             {
@@ -676,7 +686,7 @@ namespace JQuery_ECommerceAss.Controllers
             }
         }
 
-        private IActionResult CompleteCheckout(int userId, string checkoutToken)
+        private IActionResult CompleteCheckout(int userId, CheckoutReview review)
         {
             using var transactionScope = db.Database.BeginTransaction(
                 System.Data.IsolationLevel.Serializable);
@@ -694,7 +704,7 @@ namespace JQuery_ECommerceAss.Controllers
 
             var existingAttempt = db.CheckoutAttempts
                 .FirstOrDefault(attempt =>
-                    attempt.RequestId == checkoutToken &&
+                    attempt.RequestId == review.Token &&
                     attempt.UserID == userId);
             if (existingAttempt != null)
             {
@@ -702,15 +712,7 @@ namespace JQuery_ECommerceAss.Controllers
                 return RedirectToAction(nameof(Checkout));
             }
 
-            var checkoutAttempt = new CheckoutAttempt
-            {
-                RequestId = checkoutToken,
-                UserID = userId,
-                DateTime = DateTime.Now,
-                Status = "Completed"
-            };
-            db.CheckoutAttempts.Add(checkoutAttempt);
-
+            var inventory = new List<(Product Product, int Quantity)>();
             foreach (var items in cartItems.GroupBy(item => item.ProductID))
             {
                 var product = items.First().Product;
@@ -728,62 +730,54 @@ namespace JQuery_ECommerceAss.Controllers
                     return RedirectToAction(nameof(Cart));
                 }
 
-                foreach (var item in items)
-                {
-                    item.Price = product.UnitPrice;
-                }
-                product.Quantity -= (int)requiredQuantity;
+                inventory.Add((product, (int)requiredQuantity));
             }
 
+            UseCurrentPrices(cartItems);
             var authoritativeSubtotal = CheckoutPricing.CalculateSubtotal(cartItems);
-            var authoritativeGst = CheckoutPricing.CalculateGst(authoritativeSubtotal);
-            var authoritativePromotion = 0m;
-            var userPromotionId = HttpContext.Session.GetInt32("UserPromotionID");
-            UserPromotion? userPromotion = null;
-
-            if (userPromotionId.HasValue)
+            var userPromotion = FindCheckoutPromotion(userId);
+            var authoritativePromotion = CalculateCheckoutDiscount(authoritativeSubtotal, userPromotion);
+            if (authoritativePromotion == 0m)
             {
-                userPromotion = db.UserPromotions
-                    .Include(up => up.Promotion)
-                    .FirstOrDefault(up => up.UserPromotionID == userPromotionId.Value && up.UserID == userId);
-
-                var now = DateTime.Now;
-                var promo = userPromotion?.Promotion;
-                if (userPromotion != null &&
-                    promo != null &&
-                    !userPromotion.IsUsed &&
-                    promo.PromotionStatus == Status.Active &&
-                    promo.StartDate <= now &&
-                    (promo.EndDate == null || promo.EndDate >= now) &&
-                    (!promo.MinPurchaseAmount.HasValue || authoritativeSubtotal >= promo.MinPurchaseAmount.Value))
-                {
-                    authoritativePromotion = CheckoutPricing.CalculatePromotion(
-                        authoritativeSubtotal,
-                        promo,
-                        userPromotion.IsUsed,
-                        now);
-                }
-                else
-                {
-                    userPromotion = null;
-                }
+                userPromotion = null;
             }
 
-            var sellerGroups = cartItems
-                .Where(c => c.Product?.SellerID != null)
-                .GroupBy(c => c.Product!.SellerID!.Value);
+            if (!review.Lines.SequenceEqual(ReviewLines(cartItems)) ||
+                review.PromotionId != userPromotion?.UserPromotionID ||
+                review.Discount != authoritativePromotion)
+            {
+                TempData["Error"] = "Your order changed. Review the updated order before placing it.";
+                return RedirectToAction(nameof(Checkout));
+            }
+
+            db.CheckoutAttempts.Add(new CheckoutAttempt
+            {
+                RequestId = review.Token,
+                UserID = userId,
+                DateTime = DateTime.Now,
+                Status = "Completed"
+            });
+            foreach (var (product, quantity) in inventory)
+            {
+                product.Quantity -= quantity;
+            }
+
+            var authoritativeGst = CheckoutPricing.RoundMoney(CheckoutPricing.CalculateGst(authoritativeSubtotal));
+            var remainingSubtotal = authoritativeSubtotal;
+            var remainingGst = authoritativeGst;
+            var remainingPromotion = authoritativePromotion;
+            var sellerGroups = cartItems.GroupBy(item => item.Product!.SellerID!.Value).OrderBy(group => group.Key);
 
             foreach (var sellerGroup in sellerGroups)
             {
-                var sellerItems = sellerGroup.ToList();
-                var sellerSubtotal = sellerItems.Sum(c => (c.Price ?? 0) * (c.Quantity ?? 0));
-
-                var sellerGst = authoritativeSubtotal == 0
-                    ? 0
-                    : (sellerSubtotal / authoritativeSubtotal) * authoritativeGst;
-                var sellerPromotion = authoritativeSubtotal == 0
-                    ? 0
-                    : (sellerSubtotal / authoritativeSubtotal) * authoritativePromotion;
+                var sellerSubtotal = CheckoutPricing.CalculateSubtotal(sellerGroup);
+                // Allocate from the remaining amounts so the final seller record absorbs any rounding remainder.
+                var share = remainingSubtotal == 0m ? 0m : sellerSubtotal / remainingSubtotal;
+                var sellerGst = CheckoutPricing.RoundMoney(remainingGst * share);
+                var sellerPromotion = CheckoutPricing.RoundMoney(remainingPromotion * share);
+                remainingSubtotal -= sellerSubtotal;
+                remainingGst -= sellerGst;
+                remainingPromotion -= sellerPromotion;
 
                 var transaction = new TransactionHis
                 {
@@ -826,10 +820,8 @@ namespace JQuery_ECommerceAss.Controllers
                 _logger.LogWarning(ex, "Unable to send the demo order confirmation.");
             }
 
-            HttpContext.Session.Remove("AppliedPromoCode");
-            HttpContext.Session.Remove("PromotionDiscount");
             HttpContext.Session.Remove("UserPromotionID");
-            HttpContext.Session.Remove("CheckoutToken");
+            HttpContext.Session.Remove(nameof(CheckoutReview));
 
             AutoAssignPromotions(userId);
 
@@ -838,6 +830,37 @@ namespace JQuery_ECommerceAss.Controllers
                 : "Demo order placed. View the details in order history.";
             return RedirectToAction(nameof(Index));
         }
+
+        private sealed record CheckoutReview(string Token, CheckoutLine[] Lines, int? PromotionId, decimal Discount);
+        private sealed record CheckoutLine(int CartId, int? ProductId, decimal? Quantity, decimal? Price);
+
+        private static CheckoutLine[] ReviewLines(IEnumerable<Cart> cartItems) =>
+            cartItems.OrderBy(item => item.CartID)
+                .Select(item => new CheckoutLine(item.CartID, item.ProductID, item.Quantity, item.Price))
+                .ToArray();
+
+        private static void UseCurrentPrices(IEnumerable<Cart> cartItems)
+        {
+            foreach (var item in cartItems)
+            {
+                item.Price = item.Product?.UnitPrice;
+            }
+        }
+
+        private UserPromotion? FindCheckoutPromotion(int userId)
+        {
+            var promotionId = HttpContext.Session.GetInt32("UserPromotionID");
+            return promotionId.HasValue
+                ? db.UserPromotions.Include(up => up.Promotion)
+                    .FirstOrDefault(up => up.UserPromotionID == promotionId.Value && up.UserID == userId)
+                : null;
+        }
+
+        private static decimal CalculateCheckoutDiscount(decimal subtotal, UserPromotion? promotion) =>
+            promotion?.Promotion?.StartDate is not null
+                ? CheckoutPricing.RoundMoney(CheckoutPricing.CalculatePromotion(subtotal,
+                    promotion.Promotion, promotion.IsUsed, DateTime.Now))
+                : 0m;
 
         private static bool IsCheckoutConflict(Exception exception)
         {
@@ -1234,6 +1257,7 @@ namespace JQuery_ECommerceAss.Controllers
             }
 
             var cartItems = db.Carts
+                .AsNoTracking()
                 .Include(c => c.Product)
                 .Where(c => c.UserID == userId)
                 .ToList();
@@ -1244,12 +1268,9 @@ namespace JQuery_ECommerceAss.Controllers
                 return RedirectToAction(nameof(Cart));
             }
 
+            UseCurrentPrices(cartItems);
             decimal subtotal = CheckoutPricing.CalculateSubtotal(cartItems);
-            decimal discount = CheckoutPricing.CalculatePromotion(
-                subtotal,
-                promo,
-                userPromotion.IsUsed,
-                DateTime.Now);
+            var discount = CalculateCheckoutDiscount(subtotal, userPromotion);
 
             if (discount == 0m &&
                 promo.MinPurchaseAmount.HasValue &&
@@ -1260,8 +1281,6 @@ namespace JQuery_ECommerceAss.Controllers
                 return RedirectToAction(nameof(Checkout));
             }
 
-            HttpContext.Session.SetString("AppliedPromoCode", promo.PromotionCode ?? string.Empty);
-            HttpContext.Session.SetString("PromotionDiscount", discount.ToString("0.00"));
             HttpContext.Session.SetInt32("UserPromotionID", userPromotion.UserPromotionID);
 
             TempData["Success"] = $"✓ Promo code '{promo.PromotionCode}' applied! You saved RM {discount:0.00}";
@@ -1276,8 +1295,6 @@ namespace JQuery_ECommerceAss.Controllers
                 return RedirectToAction(nameof(Login));
             }
 
-            HttpContext.Session.Remove("AppliedPromoCode");
-            HttpContext.Session.Remove("PromotionDiscount");
             HttpContext.Session.Remove("UserPromotionID");
 
             TempData["Success"] = "Promo code removed successfully.";

@@ -78,12 +78,13 @@
                 transform: translateX(5px);
             }
     </style>
+    <link rel="stylesheet" href="~/css/geek-lab.css" asp-append-version="true">
 </head>
-<body>
+<body class="lab-area">
     <nav class="navbar navbar-expand-lg sticky-top">
         <div class="container">
-            <a class="navbar-brand" href="@Url.Action("Index", "User")">GEEK-LAB</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <a class="navbar-brand" href="@Url.Action("Index", "User")">Geek Lab</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-label="Toggle shop navigation" aria-controls="navbarNav" aria-expanded="false">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
@@ -92,7 +93,7 @@
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("Products", "User")"><i class="fas fa-shopping-bag"></i> Products</a></li>
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("Cart", "User")"><i class="fas fa-shopping-cart"></i> Cart</a></li>
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("MyPromotions", "User")"><i class="fas fa-tags"></i> Promotions</a></li>
-                    <li class="nav-item"><a class="nav-link active" href="@Url.Action("Profile", "User")"><i class="fas fa-user"></i> Profile</a></li>
+                    <li class="nav-item"><a class="nav-link active" aria-current="page" href="@Url.Action("Profile", "User")"><i class="fas fa-user"></i> Profile</a></li>
                     <li class="nav-item"><form asp-controller="User" asp-action="Logout" method="post"><button type="submit" class="nav-link border-0 bg-transparent"><i class="fas fa-sign-out-alt"></i> Logout</button></form></li>
                 </ul>
             </div>

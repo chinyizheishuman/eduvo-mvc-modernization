@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ ! -f "JQuery-ECommerceAss.csproj" ]]; then
-    echo "Run this script from /workspaces/eduvo-mvc-modernization." >&2
+    echo "Run this script from the Eduvo repository root." >&2
     exit 1
 fi
 
@@ -16,6 +16,49 @@ if ! command -v dotnet >/dev/null 2>&1; then
     exit 1
 fi
 
+app_port="${EDUVO_APP_PORT:-5067}"
+sql_port="${EDUVO_SQL_PORT:-1433}"
+smtp_port="${EDUVO_SMTP_PORT:-1025}"
+mailpit_port="${EDUVO_MAILPIT_PORT:-8025}"
+selected_ports=" "
+for port in "$app_port" "$sql_port" "$smtp_port" "$mailpit_port"; do
+    if [[ ! "$port" =~ ^[1-9][0-9]{0,4}$ ]] || (( port > 65535 )); then
+        echo "Demo ports must be integers from 1 to 65535." >&2
+        exit 2
+    fi
+    if [[ "$selected_ports" == *" $port "* ]]; then
+        echo "Choose a different port for each demo service." >&2
+        exit 2
+    fi
+    selected_ports+="$port "
+done
+
+# Check before restoring tools or starting anything so a second run leaves the demo alone.
+if ! container_names=$(docker ps -a --format '{{.Names}}'); then
+    echo "Docker is unavailable. Check that the daemon is running and accessible." >&2
+    exit 1
+fi
+
+if grep -qx 'eduvo-sql' <<< "$container_names"; then
+    echo "An eduvo-sql container already exists. Use your existing demo or a fresh environment." >&2
+    exit 1
+fi
+
+published_ports=$(docker ps --format '{{.Ports}}')
+if grep -q ":${sql_port}->" <<< "$published_ports"; then
+    echo "Docker is already publishing host port $sql_port. Use your existing demo or a fresh environment." >&2
+    exit 1
+fi
+
+running_names=$(docker ps --format '{{.Names}}')
+reuse_mailpit=false
+if [[ "$smtp_port" == 1025 && "$mailpit_port" == 8025 ]] && grep -qx 'eduvo-mailpit' <<< "$running_names"; then
+    reuse_mailpit=true
+elif grep -qx 'eduvo-mailpit' <<< "$container_names" || grep -Eq ":(${smtp_port}|${mailpit_port})->" <<< "$published_ports"; then
+    echo "Mailpit's container name or host ports are already in use. Use your existing demo or a fresh environment." >&2
+    exit 1
+fi
+
 export DOTNET_ROLL_FORWARD="${DOTNET_ROLL_FORWARD:-Major}"
 
 if ! DOTNET_ROLL_FORWARD=Major dotnet tool run dotnet-ef --version >/dev/null 2>&1; then
@@ -24,39 +67,40 @@ if ! DOTNET_ROLL_FORWARD=Major dotnet tool run dotnet-ef --version >/dev/null 2>
 fi
 
 export Smtp__Host="${Smtp__Host:-127.0.0.1}"
-export Smtp__Port="${Smtp__Port:-1025}"
+export Smtp__Port="${Smtp__Port:-$smtp_port}"
 export Smtp__From="${Smtp__From:-no-reply@example.test}"
 export Smtp__Username="${Smtp__Username:-}"
 export Smtp__Password="${Smtp__Password:-}"
-export ASPNETCORE_URLS="${ASPNETCORE_URLS:-http://0.0.0.0:5067}"
+export ASPNETCORE_URLS="${ASPNETCORE_URLS:-http://127.0.0.1:$app_port}"
 
-sql_started=false
-mailpit_started=false
+sql_container=""
+mailpit_container=""
 
-if docker ps --format '{{.Names}}' | grep -qx 'eduvo-sql'; then
-    echo "Eduvo SQL Server is already running. Stop eduvo-sql and rerun for a clean disposable database." >&2
-    exit 1
-fi
-if docker ps -a --format '{{.Names}}' | grep -qx 'eduvo-sql'; then
-    echo "Removing the stopped eduvo-sql container."
-    docker rm eduvo-sql >/dev/null
-fi
+cleanup() {
+    if [[ -n "$mailpit_container" ]]; then
+        docker stop "$mailpit_container" >/dev/null 2>&1 || true
+    fi
+    if [[ -n "$sql_container" ]]; then
+        docker stop "$sql_container" >/dev/null 2>&1 || true
+    fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 sql_password="Eduvo_${RANDOM}_${RANDOM}_Aa1!"
-docker run --rm --name eduvo-sql \
-    -e ACCEPT_EULA=Y \
+sql_container=$(docker run --detach --rm --name eduvo-sql \
+    -e ACCEPT_EULA=Y -e MSSQL_MEMORY_LIMIT_MB \
     -e MSSQL_SA_PASSWORD="${sql_password}" \
-    -p 127.0.0.1:1433:1433 \
-    mcr.microsoft.com/mssql/server:2022-latest >/tmp/eduvo-sql.log 2>&1 &
-sql_pid=$!
-sql_started=true
+    -p "127.0.0.1:$sql_port:1433" \
+    mcr.microsoft.com/mssql/server:2022-latest)
 
-sql_connection="Server=127.0.0.1,1433;Database=EduvoDemo;User Id=sa;Password=${sql_password};TrustServerCertificate=True"
+sql_connection="Server=127.0.0.1,$sql_port;Database=EduvoDemo;User Id=sa;Password=${sql_password};TrustServerCertificate=True"
 
 echo "Waiting for disposable SQL Server..."
 sql_ready=false
 for attempt in {1..60}; do
-    if docker exec eduvo-sql /opt/mssql-tools18/bin/sqlcmd \
+    if docker exec "$sql_container" /opt/mssql-tools18/bin/sqlcmd \
         -S localhost -U sa -P "${sql_password}" -C -Q 'SELECT 1' >/dev/null 2>&1; then
         sql_ready=true
         break
@@ -68,47 +112,26 @@ for attempt in {1..60}; do
 done
 
 if [[ "${sql_ready}" != true ]]; then
-    echo "Disposable SQL Server did not become ready. See /tmp/eduvo-sql.log." >&2
+    echo "Disposable SQL Server did not become ready." >&2
     exit 1
 fi
 
-if docker ps --format '{{.Names}}' | grep -qx 'eduvo-mailpit'; then
+if [[ "$reuse_mailpit" == true ]]; then
     echo "Using the existing eduvo-mailpit container."
 else
-    if docker ps -a --format '{{.Names}}' | grep -qx 'eduvo-mailpit'; then
-        echo "Removing the stopped eduvo-mailpit container."
-        docker rm eduvo-mailpit >/dev/null
-    fi
-
-    docker run --rm --name eduvo-mailpit \
-        -p 127.0.0.1:1025:1025 \
-        -p 127.0.0.1:8025:8025 \
-        axllent/mailpit >/tmp/eduvo-mailpit.log 2>&1 &
-    mailpit_pid=$!
-    mailpit_started=true
+    mailpit_container=$(docker run --detach --rm --name eduvo-mailpit \
+        -p "127.0.0.1:$smtp_port:1025" \
+        -p "127.0.0.1:$mailpit_port:8025" \
+        axllent/mailpit)
 fi
 
-cleanup() {
-    if [[ "${sql_started}" == true ]]; then
-        docker stop eduvo-sql >/dev/null 2>&1 || true
-        docker rm -f eduvo-sql >/dev/null 2>&1 || true
-        kill "${sql_pid:-0}" >/dev/null 2>&1 || true
-    fi
-    if [[ "${mailpit_started}" == true ]]; then
-        docker stop eduvo-mailpit >/dev/null 2>&1 || true
-        docker rm -f eduvo-mailpit >/dev/null 2>&1 || true
-        kill "${mailpit_pid:-0}" >/dev/null 2>&1 || true
-    fi
-}
-trap cleanup EXIT INT TERM
-
 for attempt in {1..20}; do
-    if curl --silent --fail --head http://127.0.0.1:8025 >/dev/null; then
+    if curl --silent --fail --head "http://127.0.0.1:$mailpit_port" >/dev/null; then
         break
     fi
 
     if [[ "${attempt}" == 20 ]]; then
-        echo "Mailpit did not become ready. See /tmp/eduvo-mailpit.log." >&2
+        echo "Mailpit did not become ready." >&2
         exit 1
     fi
     sleep 1
@@ -145,7 +168,7 @@ admin_hash=$(hash_password "${demo_admin_password}")
 seller_hash=$(hash_password "${demo_seller_password}")
 shopper_hash=$(hash_password "${demo_shopper_password}")
 
-docker exec eduvo-sql /opt/mssql-tools18/bin/sqlcmd \
+docker exec "$sql_container" /opt/mssql-tools18/bin/sqlcmd \
     -S localhost -U sa -P "${sql_password}" -d EduvoDemo -C \
     -Q "
 IF NOT EXISTS (SELECT 1 FROM [Admins] WHERE [AdminUsername] = N'demo-admin')
@@ -172,23 +195,35 @@ BEGIN
         (N'demo-shopper', N'${shopper_hash}', N'demo-shopper@example.test', 0, N'5550100', NULL, GETUTCDATE(), N'Active');
 END;
 
-IF NOT EXISTS (SELECT 1 FROM [Products] WHERE [ProductName] = N'Demo Laptop')
+INSERT INTO [Products]
+    ([ProductName], [Description], [UnitPrice], [Quantity], [SellerID], [ProductStatus], [ImagePath])
+SELECT [Name], [Description], [Price], [Stock], @sellerId, [Status], [Image]
+FROM (VALUES
+    (N'PlayStation 5 Pro', N'Home console with a DualSense controller.', 3499.00, 4, N'Active', N'/images/demo/ps5-pro.webp'),
+    (N'ROG Ally X', N'Windows handheld with 1 TB of storage.', 3299.00, 2, N'Active', N'/images/demo/rog-ally-x.jpg'),
+    (N'Steam Deck', N'Handheld gaming PC for your Steam library.', 2499.00, 8, N'Active', N'/images/demo/steam-deck.webp'),
+    (N'Demo Laptop', N'Sample listing awaiting Admin review.', 2799.00, 5, N'Pending', NULL)
+) AS [Seed] ([Name], [Description], [Price], [Stock], [Status], [Image])
+WHERE NOT EXISTS (
+    SELECT 1 FROM [Products]
+    WHERE [SellerID] = @sellerId AND [ProductName] = [Seed].[Name]
+);
+
+IF NOT EXISTS (SELECT 1 FROM [Promotions] WHERE [PromotionCode] = N'DEMO10')
 BEGIN
-    INSERT INTO [Products]
-        ([ProductName], [Description], [UnitPrice], [Quantity], [SellerID], [ProductStatus], [ImagePath])
-    VALUES
-        (N'Demo Laptop', N'Disposable demo product', 2499.00, 10, @sellerId, N'Active', NULL);
+    INSERT INTO [Promotions] ([PromotionCode], [PromotionName], [Description], [DiscountPercentage], [StartDate], [PromotionStatus])
+    VALUES (N'DEMO10', N'Demo promotion', N'10% off a sample order.', 10, DATEADD(day, -1, GETDATE()), N'Active');
 END;
 " >/dev/null
 
-cat <<'EOF'
+cat <<EOF
 
 Eduvo demo is ready:
-  Application: http://localhost:5067
-  Admin:       http://localhost:5067/Admin/Login
-  Seller:      http://localhost:5067/Seller/Login
-  Shopper:     http://localhost:5067/User/Login
-  Mailpit:     http://localhost:8025
+  Application: http://localhost:$app_port
+  Admin:       http://localhost:$app_port/Admin/Login
+  Seller:      http://localhost:$app_port/Seller/Login
+  Shopper:     http://localhost:$app_port/User/Login
+  Mailpit:     http://localhost:$mailpit_port
 
 Disposable login:
   Admin:   demo-admin / Admin123!
@@ -196,8 +231,8 @@ Disposable login:
   Shopper: demo-shopper / Shopper123!
   Shop mail: demo-shopper@example.test
 
-Keep this terminal open while recording. Press Ctrl+C to stop the app and the
-Mailpit container started by this script.
+Keep this terminal open while recording. Ctrl+C stops the app and the
+disposable containers started for this run.
 EOF
 
 env "ConnectionStrings__JQuery-ECommerceAss=${sql_connection}" \
