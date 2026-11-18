@@ -77,7 +77,7 @@
                         <div class="preview-box" id="preview">
                             @if (!string.IsNullOrEmpty(Model.ImagePath))
                             {
-                                <img src="@Model.ImagePath" alt="@Model.ProductName">
+                                <img src="@(Model.ImagePath.Split(',', 2)[0])" alt="@Model.ProductName">
                             }
                             else
                             {

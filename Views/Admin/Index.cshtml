@@ -65,7 +65,10 @@
 <body>
     <div class="admin-layout">
         <!-- Sidebar -->
-        <aside class="admin-sidebar">
+        <aside class="admin-sidebar" id="admin-menu">
+            <button class="admin-menu-close" type="button" aria-label="Close menu">
+                <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
             <div class="sidebar-header">
                 <a href="@Url.Action("Dashboard", "Admin")" class="sidebar-logo">
                     <div class="sidebar-logo-icon">
@@ -110,10 +113,12 @@
                     <h6 class="sidebar-section-title">Account</h6>
                     <ul class="sidebar-menu">
                         <li class="sidebar-menu-item">
-                            <a href="@Url.Action("Logout", "Admin")" class="sidebar-link">
-                                <i class="fas fa-sign-out-alt"></i>
-                                <span>Logout</span>
-                            </a>
+                            <form asp-controller="Admin" asp-action="Logout" method="post">
+                                <button type="submit" class="sidebar-link">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>Logout</span>
+                                </button>
+                            </form>
                         </li>
                     </ul>
                 </div>
@@ -137,6 +142,7 @@
             <!-- Top Bar -->
             <div class="admin-topbar">
                 <div class="topbar-title">
+                    <partial name="_AdminMenuButton" />
                     <i class="fas fa-box"></i>
                     Product Management
                 </div>
@@ -156,7 +162,7 @@
                         <div class="d-flex justify-content-between align-items-center gap-3">
                             <div class="search-box" style="max-width: 400px;">
                                 <i class="fas fa-search"></i>
-                                <input type="text" id="searchInput" placeholder="Search products by name, description, seller...">
+                                <input type="text" id="searchInput" aria-label="Search results" placeholder="Search products by name, description, seller...">
                             </div>
                             <div>
                                 <span class="badge badge-primary" id="productCount" style="font-size: 0.9375rem; padding: 0.5rem 1rem;">
@@ -172,7 +178,7 @@
 
                 <!-- Products Table -->
                 <div class="table-container">
-                    <div class="table-responsive">
+                    <div class="table-responsive" tabindex="0" role="region" aria-label="Scrollable results">
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -350,7 +356,9 @@
     </div>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/js/admin-menu.js" asp-append-version="true"></script>
     <script src="~/js/session-guard.js"></script>
+    <script src="~/js/render-text.js" asp-append-version="true"></script>
     <partial name="_AntiforgeryHeader" />
 
     <script>
@@ -436,7 +444,7 @@
                         const selects = $('#sellerSelect, #editSellerID');
                         selects.find('option:not(:first)').remove();
                         response.data.forEach(seller => {
-                            selects.append(`<option value="${seller.sellerID}">${seller.sellerUsername}</option>`);
+                            selects.append(`<option value="${seller.sellerID}">${escapeHtml(seller.sellerUsername)}</option>`);
                         });
                     }
                 }
@@ -457,18 +465,18 @@
 
             products.forEach(product => {
                 const statusInfo = getStatusInfo(product.productStatus);
-                const imageUrl = product.imagePath ? product.imagePath.split(',')[0] : '/images/no-image.png';
+                const imageUrl = product.imagePath ? product.imagePath.split(',')[0] : '';
                 const description = product.description ? (product.description.length > 50 ? product.description.substring(0, 50) + '...' : product.description) : 'N/A';
 
                 const row = `
                     <tr>
                         <td>${product.productID}</td>
-                        <td><img src="${imageUrl}" class="product-thumbnail" alt="${product.productName}"></td>
-                        <td><strong>${product.productName || 'N/A'}</strong></td>
-                        <td>${description}</td>
+                        <td>${imageUrl ? `<img src="${escapeHtml(imageUrl)}" class="product-thumbnail" alt="${escapeHtml(product.productName)}">` : '<i class="fas fa-box" aria-label="No product image"></i>'}</td>
+                        <td><strong>${escapeHtml(product.productName || 'N/A')}</strong></td>
+                        <td>${escapeHtml(description)}</td>
                         <td><strong style="color: #2563eb;">RM ${(product.unitPrice || 0).toFixed(2)}</strong></td>
                         <td>${product.quantity || 0}</td>
-                        <td>${product.sellerName}</td>
+                        <td>${escapeHtml(product.sellerName)}</td>
                         <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
                         <td>
                             <div class="table-actions">
@@ -556,7 +564,7 @@
                 images.forEach(img => {
                     currentImagesContainer.append(`
                         <div class="image-preview-item">
-                            <img src="${img}" alt="Product Image">
+                            <img src="${escapeHtml(img)}" alt="Product Image">
                         </div>
                     `);
                 });
@@ -608,7 +616,7 @@
                         if (p.imagePath) {
                             const images = p.imagePath.split(',');
                             images.forEach(img => {
-                                imagesHtml += `<img src="${img}" class="product-thumbnail" style="width: 80px; height: 80px; margin-right: 0.5rem;" alt="Product">`;
+                                imagesHtml += `<img src="${escapeHtml(img)}" class="product-thumbnail" style="width: 80px; height: 80px; margin-right: 0.5rem;" alt="Product">`;
                             });
                         }
 
@@ -624,11 +632,11 @@
                                 </div>
                                 <div>
                                     <strong style="color: #6b7280; font-size: 0.875rem;">Product Name:</strong>
-                                    <p>${p.productName || 'N/A'}</p>
+                                    <p>${escapeHtml(p.productName || 'N/A')}</p>
                                 </div>
                                 <div>
                                     <strong style="color: #6b7280; font-size: 0.875rem;">Description:</strong>
-                                    <p>${p.description || 'N/A'}</p>
+                                    <p>${escapeHtml(p.description || 'N/A')}</p>
                                 </div>
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                                     <div>
@@ -642,7 +650,7 @@
                                 </div>
                                 <div>
                                     <strong style="color: #6b7280; font-size: 0.875rem;">Seller:</strong>
-                                    <p>${p.sellerName}</p>
+                                    <p>${escapeHtml(p.sellerName)}</p>
                                 </div>
                                 <div>
                                     <strong style="color: #6b7280; font-size: 0.875rem;">Status:</strong>
@@ -746,7 +754,7 @@
             const alert = `
                 <div class="alert ${alertClass}">
                     <i class="fas fa-${icon}"></i>
-                    <span>${message}</span>
+                    <span>${escapeHtml(message)}</span>
                 </div>
             `;
 

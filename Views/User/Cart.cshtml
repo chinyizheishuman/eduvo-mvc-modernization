@@ -114,7 +114,7 @@
                     <li class="nav-item"><a class="nav-link active" href="@Url.Action("Cart", "User")"><i class="fas fa-shopping-cart"></i> Cart</a></li>
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("MyPromotions", "User")"><i class="fas fa-tags"></i> Promotions</a></li>
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("Profile", "User")"><i class="fas fa-user"></i> Profile</a></li>
-                    <li class="nav-item"><a class="nav-link" href="@Url.Action("Logout", "User")"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                    <li class="nav-item"><form asp-controller="User" asp-action="Logout" method="post"><button type="submit" class="nav-link border-0 bg-transparent"><i class="fas fa-sign-out-alt"></i> Logout</button></form></li>
                 </ul>
             </div>
         </div>
@@ -122,6 +122,16 @@
 
     <div class="container py-5">
         <h1 class="fw-bold mb-4">Shopping Cart</h1>
+
+        @if (TempData["Success"] is string success)
+        {
+            <div class="alert alert-success" role="status">@success</div>
+        }
+        @if (TempData["Error"] is string error)
+        {
+            <div class="alert alert-danger" role="alert">@error</div>
+        }
+
 
         <div id="alertContainer"></div>
 
@@ -136,7 +146,7 @@
                                 <div class="col-md-2">
                                     @if (!string.IsNullOrEmpty(item.Product?.ImagePath))
                                     {
-                                        <img src="@item.Product.ImagePath" class="cart-img" alt="@item.Product.ProductName">
+                                        <img src="@(item.Product.ImagePath.Split(',', 2)[0])" class="cart-img" alt="@item.Product.ProductName">
                                     }
                                     else
                                     {

@@ -75,7 +75,7 @@
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("Dashboard", "Seller")"><i class="fas fa-home"></i> Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link active" href="@Url.Action("ManageProducts", "Seller")"><i class="fas fa-box"></i> Products</a></li>
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("CustomerInsights", "Seller")"><i class="fas fa-users"></i> Customers</a></li>
-                    <li class="nav-item"><a class="nav-link" href="@Url.Action("Logout", "Seller")"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                    <li class="nav-item"><form asp-controller="Seller" asp-action="Logout" method="post"><button type="submit" class="nav-link border-0 bg-transparent"><i class="fas fa-sign-out-alt"></i> Logout</button></form></li>
                 </ul>
             </div>
         </div>
@@ -104,7 +104,7 @@
                             <div class="product-img">
                                 @if (!string.IsNullOrEmpty(product.ImagePath))
                                 {
-                                    <img src="@product.ImagePath" alt="@product.ProductName">
+                                    <img src="@(product.ImagePath.Split(',', 2)[0])" alt="@product.ProductName">
                                 }
                                 else
                                 {

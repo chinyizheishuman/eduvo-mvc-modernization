@@ -16,7 +16,10 @@
 <body>
     <div class="admin-layout">
         <!-- Sidebar -->
-        <aside class="admin-sidebar">
+        <aside class="admin-sidebar" id="admin-menu">
+            <button class="admin-menu-close" type="button" aria-label="Close menu">
+                <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
             <div class="sidebar-header">
                 <a href="@Url.Action("Dashboard", "Admin")" class="sidebar-logo">
                     <div class="sidebar-logo-icon">
@@ -61,10 +64,12 @@
                     <h6 class="sidebar-section-title">Account</h6>
                     <ul class="sidebar-menu">
                         <li class="sidebar-menu-item">
-                            <a href="@Url.Action("Logout", "Admin")" class="sidebar-link">
-                                <i class="fas fa-sign-out-alt"></i>
-                                <span>Logout</span>
-                            </a>
+                            <form asp-controller="Admin" asp-action="Logout" method="post">
+                                <button type="submit" class="sidebar-link">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>Logout</span>
+                                </button>
+                            </form>
                         </li>
                     </ul>
                 </div>
@@ -88,17 +93,9 @@
             <!-- Top Bar -->
             <div class="admin-topbar">
                 <div class="topbar-title">
+                    <partial name="_AdminMenuButton" />
                     <i class="fas fa-chart-line"></i>
                     Dashboard
-                </div>
-                <div class="topbar-actions">
-                    <div class="topbar-search">
-                        <i class="fas fa-search"></i>
-                        <input type="text" placeholder="Search..." id="globalSearch">
-                    </div>
-                    <button class="topbar-icon-btn" title="Notifications">
-                        <i class="fas fa-bell"></i>
-                    </button>
                 </div>
             </div>
 
@@ -196,7 +193,7 @@
                                 </div>
                             </div>
 
-                            <div class="table-responsive">
+                            <div class="table-responsive" tabindex="0" role="region" aria-label="Scrollable results">
                                 <table class="data-table">
                                     <thead id="dataTableHead"></thead>
                                     <tbody id="dataTableBody">
@@ -268,7 +265,9 @@
     </div>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/js/admin-menu.js" asp-append-version="true"></script>
     <script src="~/js/session-guard.js"></script>
+    <script src="~/js/render-text.js" asp-append-version="true"></script>
     <script>
         let allData = { products: [], users: [], sellers: [] };
         let currentDataType = '';
@@ -280,12 +279,6 @@
             setupSearch('#userSearch', 'users');
             setupSearch('#sellerSearch', 'sellers');
         });
-
-        function escapeHtml(value) {
-            const element = document.createElement('div');
-            element.textContent = value == null ? '' : String(value);
-            return element.innerHTML;
-        }
 
         function getStatusInfo(status) {
             const statusMap = {
@@ -379,16 +372,16 @@
 
                 filteredData.forEach(p => {
                     const statusInfo = getStatusInfo(p.productStatus);
-                    const imageUrl = p.imagePath ? p.imagePath.split(',')[0] : '/images/no-image.png';
+                    const imageUrl = p.imagePath ? p.imagePath.split(',')[0] : '';
 
                     bodyHtml += `
                         <tr>
                             <td>${p.productID}</td>
-                            <td><img src="${imageUrl}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 8px;" alt="${p.productName}"></td>
-                            <td><strong>${p.productName || 'N/A'}</strong></td>
+                            <td>${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 8px;" alt="${escapeHtml(p.productName)}">` : '<i class="fas fa-box" aria-label="No product image"></i>'}</td>
+                            <td><strong>${escapeHtml(p.productName || 'N/A')}</strong></td>
                             <td><strong style="color: #2563eb;">RM ${(p.unitPrice || 0).toFixed(2)}</strong></td>
                             <td>${p.quantity || 0}</td>
-                            <td>${p.sellerName || 'N/A'}</td>
+                            <td>${escapeHtml(p.sellerName || 'N/A')}</td>
                             <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
                             <td><a href="@Url.Action("Index", "Admin")" class="btn btn-sm btn-primary">View</a></td>
                         </tr>
@@ -403,9 +396,9 @@
                     bodyHtml += `
                         <tr>
                             <td>${u.userID}</td>
-                            <td><strong>${u.username || 'N/A'}</strong></td>
-                            <td>${u.userGmail || 'N/A'}</td>
-                            <td>${u.userPhoneNum || 'N/A'}</td>
+                            <td><strong>${escapeHtml(u.username || 'N/A')}</strong></td>
+                            <td>${escapeHtml(u.userGmail || 'N/A')}</td>
+                            <td>${escapeHtml(u.userPhoneNum || 'N/A')}</td>
                             <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
                             <td>${u.dateTime ? new Date(u.dateTime).toLocaleDateString() : 'N/A'}</td>
                             <td><a href="@Url.Action("ManageUser", "Admin")" class="btn btn-sm btn-primary">View</a></td>
@@ -421,8 +414,8 @@
                     bodyHtml += `
                         <tr>
                             <td>${s.sellerID}</td>
-                            <td><strong>${s.sellerUsername || 'N/A'}</strong></td>
-                            <td>${s.sellerEmail || 'N/A'}</td>
+                            <td><strong>${escapeHtml(s.sellerUsername || 'N/A')}</strong></td>
+                            <td>${escapeHtml(s.sellerEmail || 'N/A')}</td>
                             <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
                             <td>${s.dateTime ? new Date(s.dateTime).toLocaleDateString() : 'N/A'}</td>
                             <td><a href="@Url.Action("ManageSeller", "Admin")" class="btn btn-sm btn-primary">View</a></td>
@@ -555,22 +548,22 @@
                 if (type === 'products') {
                     const statusInfo = getStatusInfo(item.productStatus);
                     html += `<td>${item.productID}</td>
-                             <td><strong>${item.productName || 'N/A'}</strong></td>
+                             <td><strong>${escapeHtml(item.productName || 'N/A')}</strong></td>
                              <td><strong style="color: #2563eb;">RM${(item.unitPrice || 0).toFixed(2)}</strong></td>
                              <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
                              <td><a href="@Url.Action("Index", "Admin")" class="btn btn-sm btn-primary">View</a></td>`;
                 } else if (type === 'users') {
                     const statusInfo = getStatusInfo(item.userStatus);
                     html += `<td>${item.userID}</td>
-                             <td><strong>${item.username || 'N/A'}</strong></td>
-                             <td>${item.userGmail || 'N/A'}</td>
+                             <td><strong>${escapeHtml(item.username || 'N/A')}</strong></td>
+                             <td>${escapeHtml(item.userGmail || 'N/A')}</td>
                              <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
                              <td><a href="@Url.Action("ManageUser", "Admin")" class="btn btn-sm btn-primary">View</a></td>`;
                 } else if (type === 'sellers') {
                     const statusInfo = getStatusInfo(item.sellerStatus);
                     html += `<td>${item.sellerID}</td>
-                             <td><strong>${item.sellerUsername || 'N/A'}</strong></td>
-                             <td>${item.sellerEmail || 'N/A'}</td>
+                             <td><strong>${escapeHtml(item.sellerUsername || 'N/A')}</strong></td>
+                             <td>${escapeHtml(item.sellerEmail || 'N/A')}</td>
                              <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
                              <td><a href="@Url.Action("ManageSeller", "Admin")" class="btn btn-sm btn-primary">View</a></td>`;
                 }

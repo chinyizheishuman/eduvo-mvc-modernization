@@ -16,7 +16,10 @@
 <body>
     <div class="admin-layout">
         <!-- Sidebar -->
-        <aside class="admin-sidebar">
+        <aside class="admin-sidebar" id="admin-menu">
+            <button class="admin-menu-close" type="button" aria-label="Close menu">
+                <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
             <div class="sidebar-header">
                 <a href="@Url.Action("Dashboard", "Admin")" class="sidebar-logo">
                     <div class="sidebar-logo-icon">
@@ -61,10 +64,12 @@
                     <h6 class="sidebar-section-title">Account</h6>
                     <ul class="sidebar-menu">
                         <li class="sidebar-menu-item">
-                            <a href="@Url.Action("Logout", "Admin")" class="sidebar-link">
-                                <i class="fas fa-sign-out-alt"></i>
-                                <span>Logout</span>
-                            </a>
+                            <form asp-controller="Admin" asp-action="Logout" method="post">
+                                <button type="submit" class="sidebar-link">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>Logout</span>
+                                </button>
+                            </form>
                         </li>
                     </ul>
                 </div>
@@ -88,6 +93,7 @@
             <!-- Top Bar -->
             <div class="admin-topbar">
                 <div class="topbar-title">
+                    <partial name="_AdminMenuButton" />
                     <i class="fas fa-users"></i>
                     User Management
                 </div>
@@ -107,7 +113,7 @@
                         <div class="d-flex justify-content-between align-items-center gap-3">
                             <div class="search-box" style="max-width: 400px;">
                                 <i class="fas fa-search"></i>
-                                <input type="text" id="searchInput" placeholder="Search users by username, email, phone...">
+                                <input type="text" id="searchInput" aria-label="Search results" placeholder="Search users by username, email, phone...">
                             </div>
                             <div>
                                 <span class="badge badge-primary" id="userCount" style="font-size: 0.9375rem; padding: 0.5rem 1rem;">
@@ -123,7 +129,7 @@
 
                 <!-- Users Table -->
                 <div class="table-container">
-                    <div class="table-responsive">
+                    <div class="table-responsive" tabindex="0" role="region" aria-label="Scrollable results">
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -278,7 +284,9 @@
     </div>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/js/admin-menu.js" asp-append-version="true"></script>
     <script src="~/js/session-guard.js"></script>
+    <script src="~/js/render-text.js" asp-append-version="true"></script>
     <partial name="_AntiforgeryHeader" />
 
     <script>
@@ -357,9 +365,9 @@
                 const row = `
                     <tr>
                         <td>${user.userID}</td>
-                        <td><strong>${user.username || 'N/A'}</strong></td>
-                        <td>${user.userGmail || 'N/A'}</td>
-                        <td>${user.userPhoneNum || 'N/A'}</td>
+                        <td><strong>${escapeHtml(user.username || 'N/A')}</strong></td>
+                        <td>${escapeHtml(user.userGmail || 'N/A')}</td>
+                        <td>${escapeHtml(user.userPhoneNum || 'N/A')}</td>
                         <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
                         <td>${registeredDate}</td>
                         <td>${loginTryBadge}</td>
@@ -483,15 +491,15 @@
                                 </div>
                                 <div>
                                     <strong style="color: #6b7280; font-size: 0.875rem;">Username:</strong>
-                                    <p>${u.username || 'N/A'}</p>
+                                    <p>${escapeHtml(u.username || 'N/A')}</p>
                                 </div>
                                 <div>
                                     <strong style="color: #6b7280; font-size: 0.875rem;">Email:</strong>
-                                    <p>${u.userGmail || 'N/A'}</p>
+                                    <p>${escapeHtml(u.userGmail || 'N/A')}</p>
                                 </div>
                                 <div>
                                     <strong style="color: #6b7280; font-size: 0.875rem;">Phone Number:</strong>
-                                    <p>${u.userPhoneNum || 'N/A'}</p>
+                                    <p>${escapeHtml(u.userPhoneNum || 'N/A')}</p>
                                 </div>
                                 <div>
                                     <strong style="color: #6b7280; font-size: 0.875rem;">Status:</strong>
@@ -571,7 +579,7 @@
             const alert = `
                 <div class="alert ${alertClass}">
                     <i class="fas fa-${icon}"></i>
-                    <span>${message}</span>
+                    <span>${escapeHtml(message)}</span>
                 </div>
             `;
 

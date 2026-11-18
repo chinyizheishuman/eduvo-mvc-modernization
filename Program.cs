@@ -19,6 +19,16 @@ builder.Services
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
         options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
         options.SlidingExpiration = true;
+        options.Events.OnRedirectToLogin = context =>
+        {
+            var path = context.Request.Path;
+            var loginPath = path.StartsWithSegments("/Seller") ? "/Seller/Login"
+                : path.StartsWithSegments("/User") ? "/User/Login"
+                : "/Admin/Login";
+            var returnUrlQuery = new Uri(context.RedirectUri).Query;
+            context.Response.Redirect(context.Request.PathBase + loginPath + returnUrlQuery);
+            return Task.CompletedTask;
+        };
     });
 
 builder.Services.AddAuthorization(options =>

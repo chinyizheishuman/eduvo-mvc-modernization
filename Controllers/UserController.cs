@@ -5,6 +5,7 @@ using JQuery_ECommerceAss.Data;
 using JQuery_ECommerceAss.Models;
 using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
 using System.Text.Json;
@@ -19,18 +20,22 @@ namespace JQuery_ECommerceAss.Controllers
     [Authorize(Roles = "Shopper", Policy = "ShopperOnly")]
     public class UserController : Controller
     {
+        private static readonly AccountVerificationCode VerificationCode = new("ShopperVerificationCode");
         private readonly AppDbContext db;
         private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<UserController> _logger;
 
         public UserController(
             AppDbContext _db,
             IWebHostEnvironment webHostEnvironment,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ILogger<UserController> logger)
         {
             db = _db;
             _webHostEnvironment = webHostEnvironment;
             _configuration = configuration;
+            _logger = logger;
         }
 
         // ==================== LOGIN (AJAX) ====================
@@ -44,7 +49,6 @@ namespace JQuery_ECommerceAss.Controllers
             return View();
         }
 
-        [HttpPost]
         [AllowAnonymous]
         [HttpPost]
         public async Task<IActionResult> Login(User user)
@@ -107,6 +111,7 @@ namespace JQuery_ECommerceAss.Controllers
 
             getUser.LoginTry = 0;
 
+            HttpContext.Session.Clear();
             if (getUser.DateTime.HasValue)
             {
                 HttpContext.Session.SetString("LastLogin", getUser.DateTime.Value.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -206,7 +211,7 @@ namespace JQuery_ECommerceAss.Controllers
                 LoginTry = 0
             };
 
-            string otp = GenerateOTP();
+            string otp = AccountVerificationCode.Generate();
             string body = $"<h2>Welcome to Our Marketplace!</h2><p>Your OTP for registration is: <strong>{otp}</strong></p>";
 
             try
@@ -221,8 +226,7 @@ namespace JQuery_ECommerceAss.Controllers
                 };
 
                 HttpContext.Session.SetString("RegisterUser", JsonSerializer.Serialize(user, options));
-                HttpContext.Session.SetString("OTP", otp);
-                HttpContext.Session.SetString("OTPType", "Register");
+                VerificationCode.Issue(HttpContext.Session, otp, "Register");
 
                 return Json(new { success = true, message = "OTP sent to your email!" });
             }
@@ -236,7 +240,7 @@ namespace JQuery_ECommerceAss.Controllers
         [AllowAnonymous]
         public IActionResult OTP()
         {
-            if (string.IsNullOrEmpty(HttpContext.Session.GetString("OTP")))
+            if (!VerificationCode.IsActive(HttpContext.Session))
             {
                 return RedirectToAction(nameof(Login));
             }
@@ -247,17 +251,10 @@ namespace JQuery_ECommerceAss.Controllers
         [HttpPost]
         public IActionResult OTP(string otp)
         {
-            var getOtp = HttpContext.Session.GetString("OTP");
-            var otpType = HttpContext.Session.GetString("OTPType");
-
-            if (string.IsNullOrEmpty(getOtp))
+            var otpType = VerificationCode.Verify(HttpContext.Session, otp);
+            if (otpType is null)
             {
-                return Json(new { success = false, message = "OTP session expired" });
-            }
-
-            if (otp != getOtp)
-            {
-                return Json(new { success = false, message = "OTP Incorrect" });
+                return Json(new { success = false, message = "The code is invalid or expired. Request a new code if needed." });
             }
 
             if (otpType == "Register")
@@ -308,8 +305,6 @@ namespace JQuery_ECommerceAss.Controllers
 
                     //clear session
                     HttpContext.Session.Remove("RegisterUser");
-                    HttpContext.Session.Remove("OTP");
-                    HttpContext.Session.Remove("OTPType");
 
                     return Json(new { success = true, message = "Registration successful! Please wait for admin approval." });
                 }
@@ -338,9 +333,7 @@ namespace JQuery_ECommerceAss.Controllers
             }
             else if (otpType == "ForgotPassword")
             {
-                HttpContext.Session.Remove("OTP");
-                HttpContext.Session.Remove("OTPType");
-                HttpContext.Session.SetString("PasswordResetVerifiedAt", DateTime.UtcNow.ToString("O"));
+                HttpContext.Session.SetString("ShopperResetVerifiedAt", DateTime.UtcNow.ToString("O"));
                 return Json(new { success = true, redirect = "/User/ChangePassword" });
             }
 
@@ -358,22 +351,21 @@ namespace JQuery_ECommerceAss.Controllers
         [HttpPost]
         public IActionResult ForgotPassword(string email)
         {
-            HttpContext.Session.Remove("PasswordResetVerifiedAt");
+            HttpContext.Session.Remove("ShopperResetVerifiedAt");
             var getUser = db.Users.FirstOrDefault(c => c.UserGmail == email);
             if (getUser == null)
             {
                 return Json(new { success = false, message = "Email not found." });
             }
 
-            string otp = GenerateOTP();
+            string otp = AccountVerificationCode.Generate();
             string body = $"<h2>Password Reset Request</h2><p>Your OTP for password reset is: <strong>{otp}</strong></p>";
 
             try
             {
                 SendByGmail(email, body);
-                HttpContext.Session.SetString("OTP", otp);
-                HttpContext.Session.SetString("Email", email);
-                HttpContext.Session.SetString("OTPType", "ForgotPassword");
+                VerificationCode.Issue(HttpContext.Session, otp, "ForgotPassword");
+                HttpContext.Session.SetString("ShopperResetEmail", email);
 
                 return Json(new { success = true, message = "OTP sent to your email!" });
             }
@@ -408,7 +400,7 @@ namespace JQuery_ECommerceAss.Controllers
                 return Json(new { success = false, message = "Session expired" });
             }
 
-            var email = HttpContext.Session.GetString("Email");
+            var email = HttpContext.Session.GetString("ShopperResetEmail");
             var getUser = db.Users.FirstOrDefault(c => c.UserGmail == email);
 
             if (getUser == null)
@@ -419,14 +411,14 @@ namespace JQuery_ECommerceAss.Controllers
             getUser.UserPassword = PasswordSecurity.Hash(newPassword);
             db.SaveChanges();
 
-            HttpContext.Session.Remove("Email");
-            HttpContext.Session.Remove("PasswordResetVerifiedAt");
+            HttpContext.Session.Remove("ShopperResetEmail");
+            HttpContext.Session.Remove("ShopperResetVerifiedAt");
 
             return Json(new { success = true, message = "Password changed successfully!" });
         }
 
         // ==================== LOGOUT ====================
-        [AllowAnonymous]
+        [HttpPost]
         public async Task<IActionResult> Logout()
         {
             HttpContext.Session.Clear();
@@ -463,9 +455,14 @@ namespace JQuery_ECommerceAss.Controllers
             var userId = Convert.ToInt32(HttpContext.Session.GetString("LoginUser"));
             var product = db.Products.Find(productId);
 
-            if (product == null)
+            if (quantity < 1)
             {
-                return Json(new { success = false, message = "Product not found" });
+                return Json(new { success = false, message = "Quantity must be at least 1" });
+            }
+
+            if (!IsAvailableForPurchase(product))
+            {
+                return Json(new { success = false, message = "Product is unavailable" });
             }
 
             if (product.Quantity < quantity)
@@ -573,9 +570,9 @@ namespace JQuery_ECommerceAss.Controllers
                     return Json(new { success = false, message = "Quantity must be at least 1" });
                 }
 
-                if (cart.Product == null)
+                if (!IsAvailableForPurchase(cart.Product))
                 {
-                    return Json(new { success = false, message = "Product no longer exists" });
+                    return Json(new { success = false, message = "Product is unavailable" });
                 }
 
                 if (quantity > cart.Product.Quantity)
@@ -590,7 +587,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error updating quantity: " + ex.Message });
+                _logger.LogError(ex, "Error updating quantity.");
+                return Json(new { success = false, message = "Error updating quantity." });
             }
         }
 
@@ -650,7 +648,7 @@ namespace JQuery_ECommerceAss.Controllers
 
         // ==================== PROCESS PAYMENT ====================
         [HttpPost]
-        public IActionResult ProcessPayment(string cardNumber, decimal subtotal, decimal gst, decimal promotion, string promoCode, string checkoutToken)
+        public IActionResult ProcessPayment(string checkoutToken)
         {
             if (!IsUserLoggedIn())
             {
@@ -666,6 +664,23 @@ namespace JQuery_ECommerceAss.Controllers
             }
 
             var userId = Convert.ToInt32(HttpContext.Session.GetString("LoginUser"));
+            try
+            {
+                return CompleteCheckout(userId, checkoutToken);
+            }
+            catch (Exception exception) when (IsCheckoutConflict(exception))
+            {
+                _logger.LogWarning(exception, "Checkout conflicted with another order or inventory update.");
+                TempData["Error"] = "Checkout changed while you were ordering. Review your cart and try again.";
+                return RedirectToAction(nameof(Cart));
+            }
+        }
+
+        private IActionResult CompleteCheckout(int userId, string checkoutToken)
+        {
+            using var transactionScope = db.Database.BeginTransaction(
+                System.Data.IsolationLevel.Serializable);
+
             var cartItems = db.Carts
                 .Include(c => c.Product)
                 .Where(c => c.UserID == userId)
@@ -676,9 +691,6 @@ namespace JQuery_ECommerceAss.Controllers
                 TempData["Error"] = "Your cart is empty";
                 return RedirectToAction(nameof(Cart));
             }
-
-            using var transactionScope = db.Database.BeginTransaction(
-                System.Data.IsolationLevel.Serializable);
 
             var existingAttempt = db.CheckoutAttempts
                 .FirstOrDefault(attempt =>
@@ -695,29 +707,32 @@ namespace JQuery_ECommerceAss.Controllers
                 RequestId = checkoutToken,
                 UserID = userId,
                 DateTime = DateTime.Now,
-                Status = "Pending"
+                Status = "Completed"
             };
             db.CheckoutAttempts.Add(checkoutAttempt);
-            db.SaveChanges();
 
-            var products = new List<Product>();
-            foreach (var item in cartItems)
+            foreach (var items in cartItems.GroupBy(item => item.ProductID))
             {
-                var product = db.Products.Find(item.ProductID);
-                if (product == null || product.SellerID == null)
+                var product = items.First().Product;
+                if (!IsAvailableForPurchase(product) || product.SellerID == null)
                 {
                     TempData["Error"] = "A product in your cart is no longer available.";
                     return RedirectToAction(nameof(Cart));
                 }
 
-                if (item.Quantity is null or <= 0 || product.Quantity < item.Quantity)
+                var requiredQuantity = items.Sum(item => item.Quantity ?? 0);
+                if (items.Any(item => item.Quantity is null or <= 0 || item.Quantity % 1 != 0) ||
+                    requiredQuantity > product.Quantity)
                 {
                     TempData["Error"] = $"Insufficient stock for {product.ProductName}";
                     return RedirectToAction(nameof(Cart));
                 }
 
-                item.Price = product.UnitPrice;
-                products.Add(product);
+                foreach (var item in items)
+                {
+                    item.Price = product.UnitPrice;
+                }
+                product.Quantity -= (int)requiredQuantity;
             }
 
             var authoritativeSubtotal = CheckoutPricing.CalculateSubtotal(cartItems);
@@ -785,13 +800,6 @@ namespace JQuery_ECommerceAss.Controllers
                 db.TransactionHis.Add(transaction);
             }
 
-            foreach (var product in products)
-            {
-                product.Quantity -= (int)cartItems
-                    .Where(c => c.ProductID == product.ProductID)
-                    .Sum(c => c.Quantity ?? 0);
-            }
-
             if (userPromotion != null)
             {
                 userPromotion.IsUsed = true;
@@ -800,22 +808,22 @@ namespace JQuery_ECommerceAss.Controllers
             }
 
             db.Carts.RemoveRange(cartItems);
-            checkoutAttempt.Status = "Completed";
             db.SaveChanges();
             transactionScope.Commit();
 
+            var receiptSent = false;
             try
             {
                 var user = db.Users.Find(userId);
                 if (user != null && !string.IsNullOrEmpty(user.UserGmail))
                 {
                     decimal totalAmount = authoritativeSubtotal + authoritativeGst - authoritativePromotion;
-                    SendPurchaseConfirmationEmail(user.UserGmail, user.Username ?? string.Empty, totalAmount, cartItems);
+                    receiptSent = SendPurchaseConfirmationEmail(user.UserGmail, user.Username ?? string.Empty, totalAmount, cartItems);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Email send failed: {ex.Message}");
+                _logger.LogWarning(ex, "Unable to send the demo order confirmation.");
             }
 
             HttpContext.Session.Remove("AppliedPromoCode");
@@ -825,8 +833,15 @@ namespace JQuery_ECommerceAss.Controllers
 
             AutoAssignPromotions(userId);
 
-            TempData["Success"] = "Payment successful! Thank you for your purchase. A confirmation email has been sent.";
+            TempData["Success"] = receiptSent
+                ? "Demo order placed. A confirmation email was sent."
+                : "Demo order placed. View the details in order history.";
             return RedirectToAction(nameof(Index));
+        }
+
+        private static bool IsCheckoutConflict(Exception exception)
+        {
+            return exception.GetBaseException() is SqlException { Number: 1205 or 2601 or 2627 };
         }
 
         // ==================== AUTO ASSIGN PROMOTIONS ====================
@@ -943,6 +958,8 @@ namespace JQuery_ECommerceAss.Controllers
                     db.UserPromotions.Add(userPromotion);
                     assignedCount++;
                 }
+
+                db.SaveChanges();
 
                 Console.WriteLine($"=== AutoAssignPromotions END - Assigned {assignedCount} promotions to User {userId} ===");
             }
@@ -1377,13 +1394,13 @@ namespace JQuery_ECommerceAss.Controllers
 
 
         // ==================== SEND PURCHASE CONFIRMATION EMAIL ====================
-        private void SendPurchaseConfirmationEmail(string userEmail, string username, decimal amount, List<Cart> items)
+        private bool SendPurchaseConfirmationEmail(string userEmail, string username, decimal amount, List<Cart> items)
         {
             try
             {
                 var itemsHtml = string.Join("", items.Select(item =>
                     $@"<tr>
-                        <td style='padding: 10px; border-bottom: 1px solid #ddd;'>{item.Product?.ProductName}</td>
+                        <td style='padding: 10px; border-bottom: 1px solid #ddd;'>{System.Net.WebUtility.HtmlEncode(item.Product?.ProductName)}</td>
                         <td style='padding: 10px; border-bottom: 1px solid #ddd; text-align: center;'>{item.Quantity}</td>
                         <td style='padding: 10px; border-bottom: 1px solid #ddd; text-align: right;'>RM {(item.Price ?? 0):0.00}</td>
                         <td style='padding: 10px; border-bottom: 1px solid #ddd; text-align: right;'>RM {((item.Price ?? 0) * (item.Quantity ?? 0)):0.00}</td>
@@ -1410,7 +1427,7 @@ namespace JQuery_ECommerceAss.Controllers
                             <div class='header'>RETRO.TECH</div>
                             <div class='subtitle'>[ PURCHASE CONFIRMATION ]</div>
                     
-                            <p>Dear <strong>{username}</strong>,</p>
+                            <p>Dear <strong>{System.Net.WebUtility.HtmlEncode(username)}</strong>,</p>
                             <p>Thank you for your purchase! Your order has been confirmed.</p>
                     
                             <table>
@@ -1453,19 +1470,29 @@ namespace JQuery_ECommerceAss.Controllers
                 AuthenticateIfConfigured(smtp);
                 smtp.Send(new SmtpSendRequest(message), CancellationToken.None);
                 smtp.Disconnect(true);
+                return true;
             }
             catch (Exception ex)
             {
-                // Log error but don't fail the transaction
-                Console.WriteLine($"Failed to send confirmation email: {ex.Message}");
+                _logger.LogWarning(ex, "Unable to send the demo order confirmation.");
+                return false;
             }
         }
 
         // ==================== HELPER METHODS ====================
+        private static bool IsAvailableForPurchase([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] Product? product)
+        {
+            return product is { ProductStatus: Status.Active or Status.Approve, UnitPrice: >= 0, Quantity: > 0 };
+        }
+
         private bool IsUserLoggedIn()
         {
             var userId = HttpContext.Session.GetString("LoginUser");
-            return !string.IsNullOrEmpty(userId);
+            return User.IsInRole("Shopper") &&
+                   userId == User.FindFirstValue(ClaimTypes.NameIdentifier) &&
+                   int.TryParse(userId, out var id) &&
+                   db.Users.Any(u => u.UserID == id &&
+                       (u.UserStatus == Status.Active || u.UserStatus == Status.Approve));
         }
 
         private async Task SignInAsync(User user)
@@ -1491,8 +1518,8 @@ namespace JQuery_ECommerceAss.Controllers
 
         private bool IsPasswordResetVerified()
         {
-            var email = HttpContext.Session.GetString("Email");
-            var verifiedAt = HttpContext.Session.GetString("PasswordResetVerifiedAt");
+            var email = HttpContext.Session.GetString("ShopperResetEmail");
+            var verifiedAt = HttpContext.Session.GetString("ShopperResetVerifiedAt");
 
             return !string.IsNullOrEmpty(email) &&
                    DateTime.TryParse(
@@ -1546,10 +1573,5 @@ namespace JQuery_ECommerceAss.Controllers
             }
         }
 
-        private string GenerateOTP()
-        {
-            // Cryptographically secure OTP: System.Random is predictable and must never gate password resets.
-            return System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 999999).ToString();
-        }
     }
 }

@@ -16,9 +16,14 @@ namespace JQuery_ECommerceAss.Controllers
     public class AdminController : Controller
     {
         private readonly AppDbContext db;
-        public AdminController(AppDbContext _db)
+        private readonly IWebHostEnvironment webHostEnvironment;
+        private readonly ILogger<AdminController> logger;
+
+        public AdminController(AppDbContext _db, IWebHostEnvironment webHostEnvironment, ILogger<AdminController> logger)
         {
             db = _db;
+            this.webHostEnvironment = webHostEnvironment;
+            this.logger = logger;
         } 
         [AllowAnonymous]
         public IActionResult Login()
@@ -60,6 +65,7 @@ namespace JQuery_ECommerceAss.Controllers
                 return View();
             }
 
+            HttpContext.Session.Clear();
             if (getAdmin.DateTime.HasValue)
             {
                 HttpContext.Session.SetString("LastLogin", getAdmin.DateTime.Value.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -78,10 +84,9 @@ namespace JQuery_ECommerceAss.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [AllowAnonymous]
+        [HttpPost]
         public async Task<IActionResult> Logout()
         {
-            var adminId = HttpContext.Session.GetString("LoginAdmin");
             HttpContext.Session.Clear();
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return RedirectToAction(nameof(Login));
@@ -227,7 +232,17 @@ namespace JQuery_ECommerceAss.Controllers
             {
                 try
                 {
-                    db.Update(product);
+                    var existing = await db.Products.FindAsync(id);
+                    if (existing == null)
+                    {
+                        return NotFound();
+                    }
+                    existing.ProductName = product.ProductName;
+                    existing.Description = product.Description;
+                    existing.UnitPrice = product.UnitPrice;
+                    existing.Quantity = product.Quantity;
+                    existing.SellerID = product.SellerID;
+                    existing.ProductStatus = product.ProductStatus;
                     await db.SaveChangesAsync();
                     TempData["Success"] = "Product updated successfully!";
                 }
@@ -418,7 +433,16 @@ namespace JQuery_ECommerceAss.Controllers
 
             try
             {
-                db.Update(user);
+                var existing = await db.Users.FindAsync(id);
+                if (existing == null)
+                {
+                    return NotFound();
+                }
+                existing.Username = user.Username;
+                existing.UserGmail = user.UserGmail;
+                existing.UserPhoneNum = user.UserPhoneNum;
+                existing.UserStatus = user.UserStatus;
+                existing.LoginTry = user.LoginTry;
                 await db.SaveChangesAsync();
                 TempData["Success"] = "User updated successfully!";
             }
@@ -555,7 +579,15 @@ namespace JQuery_ECommerceAss.Controllers
 
             try
             {
-                db.Update(seller);
+                var existing = await db.Sellers.FindAsync(id);
+                if (existing == null)
+                {
+                    return NotFound();
+                }
+                existing.SellerUsername = seller.SellerUsername;
+                existing.SellerEmail = seller.SellerEmail;
+                existing.SellerStatus = seller.SellerStatus;
+                existing.LoginTry = seller.LoginTry;
                 await db.SaveChangesAsync();
                 TempData["Success"] = "Seller updated successfully!";
             }
@@ -673,7 +705,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error loading products: " + ex.Message });
+                logger.LogError(ex, "Error loading products.");
+                return Json(new { success = false, message = "Error loading products." });
             }
         }
 
@@ -713,7 +746,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error loading product: " + ex.Message });
+                logger.LogError(ex, "Error loading product.");
+                return Json(new { success = false, message = "Error loading product." });
             }
         }
 
@@ -727,30 +761,23 @@ namespace JQuery_ECommerceAss.Controllers
 
             try
             {
+                product.ImagePath = null;
                 if (images != null && images.Count > 0)
                 {
                     var imagesUrls = new List<string>();
-                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "products");
+                    var uploadsFolder = Path.Combine(webHostEnvironment.WebRootPath, "images", "products");
+                    if (images.Any(image => image.Length > 0 && !FileUploadSecurity.IsSafeImage(image)))
+                    {
+                        return Json(new { success = false, message = "Only valid JPG, PNG, or WEBP images up to 5 MB are allowed." });
+                    }
                     Directory.CreateDirectory(uploadsFolder);
 
-                    foreach (var image in images)
+                    foreach (var image in images.Where(image => image.Length > 0))
                     {
-                        if (image.Length > 0 && FileUploadSecurity.IsSafeImage(image))
-                        {
-                            var uniqueFileName = FileUploadSecurity.CreateSafeFileName(image);
-                            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-                            using (var fileStream = new FileStream(filePath, FileMode.Create))
-                            {
-                                await image.CopyToAsync(fileStream);
-                            }
-
-                            imagesUrls.Add("/images/products/" + uniqueFileName);
-                        }
-                        else if (image.Length > 0)
-                        {
-                            return Json(new { success = false, message = "Only valid JPG, PNG, or WEBP images up to 5 MB are allowed." });
-                        }
+                        var uniqueFileName = FileUploadSecurity.CreateSafeFileName(image);
+                        await using var fileStream = new FileStream(Path.Combine(uploadsFolder, uniqueFileName), FileMode.CreateNew);
+                        await image.CopyToAsync(fileStream);
+                        imagesUrls.Add("/images/products/" + uniqueFileName);
                     }
 
                     product.ImagePath = string.Join(",", imagesUrls);
@@ -763,7 +790,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error creating product: " + ex.Message });
+                logger.LogError(ex, "Error creating product.");
+                return Json(new { success = false, message = "Error creating product." });
             }
         }
 
@@ -790,47 +818,40 @@ namespace JQuery_ECommerceAss.Controllers
                 existingProduct.ProductStatus = product.ProductStatus;
                 existingProduct.SellerID = product.SellerID;
 
-                if(images != null && images.Count > 0)
+                var replacedImages = (string?)null;
+                var selectedImages = images?.Where(image => image.Length > 0).ToList();
+                if (selectedImages is { Count: > 0 })
                 {
+                    if (selectedImages.Any(image => !FileUploadSecurity.IsSafeImage(image)))
+                    {
+                        return Json(new { success = false, message = "Only valid JPG, PNG, or WEBP images up to 5 MB are allowed." });
+                    }
+
                     var imageUrls = new List<string>();
-                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "products");
-
-                    if (!Directory.Exists(uploadsFolder))
+                    var uploadsFolder = Path.Combine(webHostEnvironment.WebRootPath, "images", "products");
+                    Directory.CreateDirectory(uploadsFolder);
+                    foreach (var image in selectedImages)
                     {
-                        Directory.CreateDirectory(uploadsFolder);
+                        var uniqueFileName = FileUploadSecurity.CreateSafeFileName(image);
+                        await using var fileStream = new FileStream(Path.Combine(uploadsFolder, uniqueFileName), FileMode.CreateNew);
+                        await image.CopyToAsync(fileStream);
+                        imageUrls.Add("/images/products/" + uniqueFileName);
                     }
 
-                    foreach (var image in images)
-                    {
-                        if (image.Length > 0 && FileUploadSecurity.IsSafeImage(image))
-                        {
-                            var uniqueFileName = FileUploadSecurity.CreateSafeFileName(image);
-                            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-                            using (var fileStream = new FileStream(filePath, FileMode.Create))
-                            {
-                                await image.CopyToAsync(fileStream);
-                            }
-
-                            imageUrls.Add("/images/products/" + uniqueFileName);
-                        }
-                        else if (image.Length > 0)
-                        {
-                            return Json(new { success = false, message = "Only valid JPG, PNG, or WEBP images up to 5 MB are allowed." });
-                        }
-                    }
-
+                    replacedImages = existingProduct.ImagePath;
                     existingProduct.ImagePath = string.Join(",", imageUrls);
                 }
 
                 db.Update(existingProduct);
                 await db.SaveChangesAsync();
+                FileUploadSecurity.DeleteStoredProductImages(webHostEnvironment.WebRootPath, replacedImages, logger);
 
                 return Json(new { success = true, message = "Product updated successfully" });
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error updating product: " + ex.Message });
+                logger.LogError(ex, "Error updating product.");
+                return Json(new { success = false, message = "Error updating product." });
             }
         }
 
@@ -850,32 +871,16 @@ namespace JQuery_ECommerceAss.Controllers
                     return Json(new { success = false, message = "Product  not found" });
                 }
 
-                // delete 相关image
-                if (!string.IsNullOrEmpty(product.ImagePath))
-                {
-                    var imagePaths = product.ImagePath.Split(',');
-                    foreach (var imagePath in imagePaths)
-                    {
-                        var fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", imagePath.TrimStart('/'));
-                        if (System.IO.File.Exists(fullPath))
-                        {
-                            try
-                            {
-                                System.IO.File.Delete(fullPath);
-                            }
-                            catch { /* ignore file delete error */ }
-                        }
-                    }
-                }
-
                 db.Products.Remove(product);
                 await db.SaveChangesAsync();
+                FileUploadSecurity.DeleteStoredProductImages(webHostEnvironment.WebRootPath, product.ImagePath, logger);
 
                 return Json(new { success = true, message = "Product deleted successfully" });
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error deleting product: " + ex.Message });
+                logger.LogError(ex, "Error deleting product.");
+                return Json(new { success = false, message = "Error deleting product." });
             }
         }
 
@@ -903,7 +908,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch(Exception ex)
             {
-                return Json(new { success = false, message = "Error updating status: " + ex.Message });
+                logger.LogError(ex, "Error updating status.");
+                return Json(new { success = false, message = "Error updating status." });
             }
         }
 
@@ -938,7 +944,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch(Exception ex)
             {
-                return Json(new { success = false, message = "Error searching products: " + ex.Message });
+                logger.LogError(ex, "Error searching products.");
+                return Json(new { success = false, message = "Error searching products." });
             }
         }
 
@@ -972,7 +979,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch(Exception ex)
             {
-                return Json(new { success = false, message = "Error loading users: " + ex.Message });
+                logger.LogError(ex, "Error loading users.");
+                return Json(new { success = false, message = "Error loading users." });
             }
         }
 
@@ -1009,7 +1017,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error loading user: " + ex.Message });
+                logger.LogError(ex, "Error loading user.");
+                return Json(new { success = false, message = "Error loading user." });
             }
         }
 
@@ -1053,7 +1062,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error updating user: " + ex.Message });
+                logger.LogError(ex, "Error updating user.");
+                return Json(new { success = false, message = "Error updating user." });
             }
         }
 
@@ -1080,7 +1090,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error deleting user: " + ex.Message });
+                logger.LogError(ex, "Error deleting user.");
+                return Json(new { success = false, message = "Error deleting user." });
             }
         }
 
@@ -1114,7 +1125,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error updating status: " + ex.Message });
+                logger.LogError(ex, "Error updating status.");
+                return Json(new { success = false, message = "Error updating status." });
             }
         }
 
@@ -1146,7 +1158,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error searching users: " + ex.Message });
+                logger.LogError(ex, "Error searching users.");
+                return Json(new { success = false, message = "Error searching users." });
             }
         }
 
@@ -1178,7 +1191,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error loading sellers: " + ex.Message });
+                logger.LogError(ex, "Error loading sellers.");
+                return Json(new { success = false, message = "Error loading sellers." });
             }
         }
 
@@ -1214,7 +1228,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error loading seller: " + ex.Message });
+                logger.LogError(ex, "Error loading seller.");
+                return Json(new { success = false, message = "Error loading seller." });
             }
         }
 
@@ -1257,7 +1272,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error updating seller: " + ex.Message });
+                logger.LogError(ex, "Error updating seller.");
+                return Json(new { success = false, message = "Error updating seller." });
             }
         }
 
@@ -1284,7 +1300,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error deleting seller: " + ex.Message });
+                logger.LogError(ex, "Error deleting seller.");
+                return Json(new { success = false, message = "Error deleting seller." });
             }
         }
 
@@ -1314,7 +1331,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error searching sellers: " + ex.Message });
+                logger.LogError(ex, "Error searching sellers.");
+                return Json(new { success = false, message = "Error searching sellers." });
             }
         }
 
@@ -1348,7 +1366,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch(Exception ex)
             {
-                return Json(new { success = false, message = "Error updating seller status: " + ex.Message });
+                logger.LogError(ex, "Error updating seller status.");
+                return Json(new { success = false, message = "Error updating seller status." });
             }
         }
 
@@ -1366,6 +1385,10 @@ namespace JQuery_ECommerceAss.Controllers
                 {
                     return Json(new { success = false, message = "Username and Email are required" });
                 }
+                if (string.IsNullOrWhiteSpace(user.UserPassword))
+                {
+                    return Json(new { success = false, message = "Password is required" });
+                }
 
                 var existingUser = await db.Users
                     .FirstOrDefaultAsync(u => u.Username == user.Username || u.UserGmail == user.UserGmail);
@@ -1378,6 +1401,7 @@ namespace JQuery_ECommerceAss.Controllers
                 user.RegisterDate = DateTime.Now;
                 user.DateTime = DateTime.Now;
                 user.LoginTry = 0;
+                user.UserPassword = PasswordSecurity.Hash(user.UserPassword);
 
                 db.Users.Add(user);
                 await db.SaveChangesAsync();
@@ -1386,7 +1410,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch(Exception ex)
             {
-                return Json(new { success = false, message = "Error creating user: " + ex.Message });
+                logger.LogError(ex, "Error creating user.");
+                return Json(new { success = false, message = "Error creating user." });
             }
         }
 
@@ -1404,6 +1429,10 @@ namespace JQuery_ECommerceAss.Controllers
                 {
                     return Json(new { success = false, message = "Username and Email are required" });
                 }
+                if (string.IsNullOrWhiteSpace(seller.SellerPassword))
+                {
+                    return Json(new { success = false, message = "Password is required" });
+                }
 
                 var existingSeller = await db.Sellers
                     .FirstOrDefaultAsync(s => s.SellerUsername == seller.SellerUsername || s.SellerEmail == seller.SellerEmail);
@@ -1415,6 +1444,7 @@ namespace JQuery_ECommerceAss.Controllers
 
                 seller.DateTime = DateTime.Now;
                 seller.LoginTry = 0;
+                seller.SellerPassword = PasswordSecurity.Hash(seller.SellerPassword);
 
                 db.Sellers.Add(seller);
                 await db.SaveChangesAsync();
@@ -1423,7 +1453,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch(Exception ex)
             {
-                return Json(new { success = false, message = "Error creating seller: " + ex.Message });
+                logger.LogError(ex, "Error creating seller.");
+                return Json(new { success = false, message = "Error creating seller." });
             }
         }
 
@@ -1457,7 +1488,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error loading sellers: " + ex.Message });
+                logger.LogError(ex, "Error loading sellers.");
+                return Json(new { success = false, message = "Error loading sellers." });
             }
         }
 
@@ -1515,7 +1547,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error loading stats: " + ex.Message });
+                logger.LogError(ex, "Error loading stats.");
+                return Json(new { success = false, message = "Error loading stats." });
             }
         }
 
@@ -1524,7 +1557,7 @@ namespace JQuery_ECommerceAss.Controllers
         private bool IsAdminLoggedIn()
         {
             var adminId = HttpContext.Session.GetString("LoginAdmin");
-            return !string.IsNullOrEmpty(adminId);
+            return User.IsInRole("Admin") && adminId == User.FindFirstValue(ClaimTypes.NameIdentifier);
         }
 
         private async Task SignInAsync(Admin admin)

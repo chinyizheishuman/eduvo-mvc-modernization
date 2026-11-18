@@ -85,7 +85,7 @@
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("Cart", "User")"><i class="fas fa-shopping-cart"></i> Cart</a></li>
                     <li class="nav-item"><a class="nav-link active" href="@Url.Action("MyPromotions", "User")"><i class="fas fa-tags"></i> Promotions</a></li>
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("Profile", "User")"><i class="fas fa-user"></i> Profile</a></li>
-                    <li class="nav-item"><a class="nav-link" href="@Url.Action("Logout", "User")"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                    <li class="nav-item"><form asp-controller="User" asp-action="Logout" method="post"><button type="submit" class="nav-link border-0 bg-transparent"><i class="fas fa-sign-out-alt"></i> Logout</button></form></li>
                 </ul>
             </div>
         </div>

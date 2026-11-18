@@ -133,7 +133,7 @@
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("Cart", "User")"><i class="fas fa-shopping-cart"></i> Cart</a></li>
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("MyPromotions", "User")"><i class="fas fa-tags"></i> Promotions</a></li>
                     <li class="nav-item"><a class="nav-link" href="@Url.Action("Profile", "User")"><i class="fas fa-user"></i> Profile</a></li>
-                    <li class="nav-item"><a class="nav-link" href="@Url.Action("Logout", "User")"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                    <li class="nav-item"><form asp-controller="User" asp-action="Logout" method="post"><button type="submit" class="nav-link border-0 bg-transparent"><i class="fas fa-sign-out-alt"></i> Logout</button></form></li>
                 </ul>
             </div>
         </div>
@@ -157,7 +157,7 @@
                             <div class="product-img">
                                 @if (!string.IsNullOrEmpty(product.ImagePath))
                                 {
-                                    <img src="@product.ImagePath" alt="@product.ProductName">
+                                    <img src="@(product.ImagePath.Split(',', 2)[0])" alt="@product.ProductName">
                                 }
                                 else
                                 {
@@ -206,6 +206,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
     <script src="~/js/session-guard.js"></script>
+    <script src="~/js/render-text.js" asp-append-version="true"></script>
     <partial name="_AntiforgeryHeader" />
     <script>
         function updateQty(productId, change, maxQty) {
@@ -243,7 +244,7 @@
 
         function showAlert(type, message) {
             const alert = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                ${message}
+                ${escapeHtml(message)}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>`;
             $('#alertContainer').html(alert);

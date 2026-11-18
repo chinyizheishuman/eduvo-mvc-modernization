@@ -34,4 +34,25 @@ public class FileUploadSecurityTests
         Assert.DoesNotContain("unsafe", name);
         Assert.EndsWith(".jpg", name);
     }
+
+    [Theory]
+    [InlineData("WEBP", true)]
+    [InlineData("WAVE", false)]
+    public void WebpSignatureIncludesTheContainerType(string fileType, bool accepted)
+    {
+        var bytes = System.Text.Encoding.ASCII.GetBytes("RIFF0000" + fileType);
+        var file = new FormFile(new MemoryStream(bytes), 0, bytes.Length, "image", "test.webp");
+
+        Assert.Equal(accepted, FileUploadSecurity.IsSafeImage(file));
+    }
+
+    [Fact]
+    public void ProductImagePathsAreLimitedToTheUploadsDirectory()
+    {
+        var webRoot = Path.Combine(Path.GetTempPath(), "eduvo-test-webroot");
+
+        Assert.Equal(Path.Combine(webRoot, "images", "products", "legacy name.webp"),
+            FileUploadSecurity.GetStoredProductImagePath(webRoot, "/images/products/legacy name.webp"));
+        Assert.Null(FileUploadSecurity.GetStoredProductImagePath(webRoot, "/images/other.jpg"));
+    }
 }

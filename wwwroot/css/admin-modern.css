@@ -93,6 +93,7 @@ body {
 
 .admin-main {
     flex: 1;
+    min-width: 0;
     margin-left: var(--sidebar-width);
     background: var(--gray-50);
     min-height: 100vh;
@@ -156,6 +157,14 @@ body {
 
 .sidebar-menu-item {
     margin: 0.25rem 0.75rem;
+}
+
+button.sidebar-link {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
 }
 
 .sidebar-link {
@@ -1062,12 +1071,59 @@ textarea.form-control {
    RESPONSIVE
    =================================== */
 
+.admin-menu-toggle,
+.admin-menu-close {
+    display: none;
+}
+
 @media (max-width: 768px) {
+    .admin-menu-toggle,
+    .admin-menu-close {
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        width: 44px;
+        height: 44px;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        background: white;
+        color: var(--gray-900);
+        cursor: pointer;
+    }
+
+    .admin-menu-close {
+        margin: 0.75rem 0.75rem 0 auto;
+    }
+
+    .admin-topbar {
+        padding: 0.75rem 1rem;
+        gap: 0.75rem;
+    }
+
+    .topbar-title {
+        font-size: 1.125rem;
+    }
+
+    .topbar-title > i {
+        display: none;
+    }
+
+    .topbar-actions .btn {
+        white-space: nowrap;
+    }
+
+    .admin-content {
+        padding: 1rem;
+    }
+
     .admin-sidebar {
+        width: min(20rem, 90vw);
+        visibility: hidden;
         transform: translateX(-100%);
     }
 
         .admin-sidebar.open {
+            visibility: visible;
             transform: translateX(0);
         }
 

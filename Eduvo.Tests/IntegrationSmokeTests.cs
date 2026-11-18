@@ -263,6 +263,35 @@ public class IntegrationSmokeTests : IClassFixture<SmokeTestFactory>
         Assert.False(_factory.Observe(db => db.Products.Any(p => p.ProductID == id)));
     }
 
+    [Fact]
+    public async Task AdminAccountCreation_HashesTheInitialPasswords()
+    {
+        using var client = CreateClient();
+        await SignInAdminAsync(client);
+        var page = await client.GetStringAsync("/Admin/ManageUser");
+        client.DefaultRequestHeaders.Add("RequestVerificationToken",
+            await GetAsync(page, "__RequestVerificationToken"));
+        var username = $"new-account-{Run}";
+        const string password = "OnlyUsedInTests!1";
+
+        Assert.True(await PostFormAsync(client, "/Admin/CreateUserAjax", new()
+        {
+            ["Username"] = username, ["UserGmail"] = $"{username}@example.test", ["UserPassword"] = password
+        }));
+        Assert.True(await PostFormAsync(client, "/Admin/CreateSellerAjax", new()
+        {
+            ["SellerUsername"] = username, ["SellerEmail"] = $"{username}@example.test", ["SellerPassword"] = password
+        }));
+
+        var userHash = _factory.Observe(db => db.Users.Single(u => u.Username == username).UserPassword);
+        var sellerHash = _factory.Observe(db => db.Sellers.Single(s => s.SellerUsername == username).SellerPassword);
+        Assert.True(PasswordSecurity.Verify(userHash!, password, out var upgradedUserHash));
+        Assert.True(PasswordSecurity.Verify(sellerHash!, password, out var upgradedSellerHash));
+        Assert.Null(upgradedUserHash);
+        Assert.Null(upgradedSellerHash);
+        Assert.NotEqual(userHash, sellerHash);
+    }
+
     private async Task SignInAdminAsync(HttpClient client)
     {
         _factory.Seed(db => db.Admins.Add(new Admin
@@ -391,17 +420,13 @@ public class IntegrationSmokeTests : IClassFixture<SmokeTestFactory>
         var productId = accounts.ProductId;
         var client = CreateClient();
         var promotionCode = $"SMOKE-{Run}";
-        _factory.Seed(db => db.UserPromotions.Add(new UserPromotion
+        _factory.Seed(db => db.Promotions.Add(new Promotion
         {
-            UserID = userId,
-            Promotion = new Promotion
-            {
-                PromotionCode = promotionCode,
-                PromotionName = "Smoke promotion",
-                PromotionStatus = Status.Active,
-                DiscountPercentage = 10,
-                StartDate = DateTime.Now.AddDays(-1)
-            }
+            PromotionCode = promotionCode,
+            PromotionName = "Smoke promotion",
+            PromotionStatus = Status.Active,
+            DiscountPercentage = 10,
+            StartDate = DateTime.Now.AddDays(-1)
         }));
 
         // 1. Login with exactly the payload the real AJAX view sends, including
@@ -450,7 +475,7 @@ public class IntegrationSmokeTests : IClassFixture<SmokeTestFactory>
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["productId"] = productId.ToString(),
-                ["quantity"] = "2"
+                ["quantity"] = "1"
             })
         };
         addRequest.Headers.Add("RequestVerificationToken", ajaxToken);
@@ -460,6 +485,12 @@ public class IntegrationSmokeTests : IClassFixture<SmokeTestFactory>
         {
             Assert.Fail($"AddToCartAjax returned {(int)addToCart.StatusCode}. Response excerpt: {Truncate(cartBody)}");
         }
+
+        // Older carts can contain several rows for the same product.
+        _factory.Seed(db => db.Carts.Add(new Cart
+        {
+            UserID = userId, ProductID = productId, Quantity = 1, Price = 50m
+        }));
 
         // 4. Cart page renders.
         var cart = await client.GetAsync("/User/Cart");
@@ -479,6 +510,7 @@ public class IntegrationSmokeTests : IClassFixture<SmokeTestFactory>
         Assert.Equal(HttpStatusCode.Redirect, applyPromotion.StatusCode);
         checkoutHtml = await client.GetStringAsync("/User/Checkout");
         Assert.Contains("RM 96.00", checkoutHtml);
+        Assert.DoesNotContain("name=\"cardNumber\"", checkoutHtml);
         var checkoutToken = await GetAsync(checkoutHtml, "checkoutToken");
         Assert.False(string.IsNullOrEmpty(checkoutToken), "Checkout page did not render a checkout token.");
 
@@ -489,11 +521,6 @@ public class IntegrationSmokeTests : IClassFixture<SmokeTestFactory>
 
         var payment = await client.PostAsync("/User/ProcessPayment", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["cardNumber"] = "4111111111111111",
-            ["subtotal"] = "100",
-            ["gst"] = "6",
-            ["promotion"] = "0",
-            ["promoCode"] = "",
             ["checkoutToken"] = checkoutToken,
             ["__RequestVerificationToken"] = paymentToken
         }));
@@ -521,11 +548,6 @@ public class IntegrationSmokeTests : IClassFixture<SmokeTestFactory>
         // 8. Replaying the same payment must not create a second transaction.
         var replay = await client.PostAsync("/User/ProcessPayment", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["cardNumber"] = "4111111111111111",
-            ["subtotal"] = "100",
-            ["gst"] = "6",
-            ["promotion"] = "0",
-            ["promoCode"] = "",
             ["checkoutToken"] = checkoutToken,
             ["__RequestVerificationToken"] = paymentToken
         }));

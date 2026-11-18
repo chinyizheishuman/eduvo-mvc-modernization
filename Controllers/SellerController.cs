@@ -18,18 +18,22 @@ namespace JQuery_ECommerceAss.Controllers
     [Authorize(Roles = "Seller", Policy = "SellerOnly")]
     public class SellerController : Controller
     {
+        private static readonly AccountVerificationCode VerificationCode = new("SellerVerificationCode");
         private readonly AppDbContext db;
         private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<SellerController> _logger;
 
         public SellerController(
             AppDbContext _db,
             IWebHostEnvironment webHostEnvironment,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ILogger<SellerController> logger)
         {
             db = _db;
             _webHostEnvironment = webHostEnvironment;
             _configuration = configuration;
+            _logger = logger;
         }
 
         // ==================== LOGIN (AJAX) ====================
@@ -43,7 +47,6 @@ namespace JQuery_ECommerceAss.Controllers
             return View();
         }
 
-        [HttpPost]
         [AllowAnonymous]
         [HttpPost]
         public async Task<IActionResult> Login(Seller seller)
@@ -106,6 +109,7 @@ namespace JQuery_ECommerceAss.Controllers
 
             getSeller.LoginTry = 0;
 
+            HttpContext.Session.Clear();
             if (getSeller.DateTime.HasValue)
             {
                 HttpContext.Session.SetString("LastLogin", getSeller.DateTime.Value.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -155,7 +159,7 @@ namespace JQuery_ECommerceAss.Controllers
                 LoginTry = 0
             };
 
-            string otp = GenerateOTP();
+            string otp = AccountVerificationCode.Generate();
             string body = $"<h2>Welcome to Our Marketplace!</h2><p>Your OTP for registration is: <strong>{otp}</strong></p>";
 
             try
@@ -170,8 +174,7 @@ namespace JQuery_ECommerceAss.Controllers
                 };
 
                 HttpContext.Session.SetString("RegisterSeller", JsonSerializer.Serialize(seller, options));
-                HttpContext.Session.SetString("OTP", otp);
-                HttpContext.Session.SetString("OTPType", "Register");
+                VerificationCode.Issue(HttpContext.Session, otp, "Register");
 
                 return Json(new { success = true, message = "OTP sent to your email!" });
             }
@@ -185,7 +188,7 @@ namespace JQuery_ECommerceAss.Controllers
         [AllowAnonymous]
         public IActionResult OTP()
         {
-            if (string.IsNullOrEmpty(HttpContext.Session.GetString("OTP")))
+            if (!VerificationCode.IsActive(HttpContext.Session))
             {
                 return RedirectToAction(nameof(Login));
             }
@@ -196,17 +199,10 @@ namespace JQuery_ECommerceAss.Controllers
         [HttpPost]
         public IActionResult OTP(string otp)
         {
-            var getOtp = HttpContext.Session.GetString("OTP");
-            var otpType = HttpContext.Session.GetString("OTPType");
-
-            if (string.IsNullOrEmpty(getOtp))
+            var otpType = VerificationCode.Verify(HttpContext.Session, otp);
+            if (otpType is null)
             {
-                return Json(new { success = false, message = "OTP session expired" });
-            }
-
-            if (otp != getOtp)
-            {
-                return Json(new { success = false, message = "OTP Incorrect" });
+                return Json(new { success = false, message = "The code is invalid or expired. Request a new code if needed." });
             }
 
             if (otpType == "Register")
@@ -238,16 +234,12 @@ namespace JQuery_ECommerceAss.Controllers
                 db.SaveChanges();
 
                 HttpContext.Session.Remove("RegisterSeller");
-                HttpContext.Session.Remove("OTP");
-                HttpContext.Session.Remove("OTPType");
 
                 return Json(new { success = true, message = "Registration successful! Please wait for admin approval." });
             }
             else if (otpType == "ForgotPassword")
             {
-                HttpContext.Session.Remove("OTP");
-                HttpContext.Session.Remove("OTPType");
-                HttpContext.Session.SetString("PasswordResetVerifiedAt", DateTime.UtcNow.ToString("O"));
+                HttpContext.Session.SetString("SellerResetVerifiedAt", DateTime.UtcNow.ToString("O"));
                 return Json(new { success = true, redirect = "/Seller/ChangePassword" });
             }
 
@@ -265,22 +257,21 @@ namespace JQuery_ECommerceAss.Controllers
         [HttpPost]
         public IActionResult ForgotPassword(string email)
         {
-            HttpContext.Session.Remove("PasswordResetVerifiedAt");
+            HttpContext.Session.Remove("SellerResetVerifiedAt");
             var getSeller = db.Sellers.FirstOrDefault(s => s.SellerEmail == email);
             if (getSeller == null)
             {
                 return Json(new { success = false, message = "Email not found." });
             }
 
-            string otp = GenerateOTP();
+            string otp = AccountVerificationCode.Generate();
             string body = $"<h2>Password Reset Request</h2><p>Your OTP for password reset is: <strong>{otp}</strong></p>";
 
             try
             {
                 SendByGmail(email, body);
-                HttpContext.Session.SetString("OTP", otp);
-                HttpContext.Session.SetString("Email", email);
-                HttpContext.Session.SetString("OTPType", "ForgotPassword");
+                VerificationCode.Issue(HttpContext.Session, otp, "ForgotPassword");
+                HttpContext.Session.SetString("SellerResetEmail", email);
 
                 return Json(new { success = true, message = "OTP sent to your email!" });
             }
@@ -315,7 +306,7 @@ namespace JQuery_ECommerceAss.Controllers
                 return Json(new { success = false, message = "Session expired" });
             }
 
-            var email = HttpContext.Session.GetString("Email");
+            var email = HttpContext.Session.GetString("SellerResetEmail");
             var getSeller = db.Sellers.FirstOrDefault(s => s.SellerEmail == email);
 
             if (getSeller == null)
@@ -326,14 +317,14 @@ namespace JQuery_ECommerceAss.Controllers
             getSeller.SellerPassword = PasswordSecurity.Hash(newPassword);
             db.SaveChanges();
 
-            HttpContext.Session.Remove("Email");
-            HttpContext.Session.Remove("PasswordResetVerifiedAt");
+            HttpContext.Session.Remove("SellerResetEmail");
+            HttpContext.Session.Remove("SellerResetVerifiedAt");
 
             return Json(new { success = true, message = "Password changed successfully!" });
         }
 
         // ==================== LOGOUT ====================
-        [AllowAnonymous]
+        [HttpPost]
         public async Task<IActionResult> Logout()
         {
             HttpContext.Session.Clear();
@@ -404,6 +395,7 @@ namespace JQuery_ECommerceAss.Controllers
             var sellerId = Convert.ToInt32(HttpContext.Session.GetString("LoginSeller"));
             product.SellerID = sellerId;
             product.ProductStatus = Status.Pending;
+            product.ImagePath = null;
 
             if (Image != null && Image.Length > 0)
             {
@@ -419,7 +411,7 @@ namespace JQuery_ECommerceAss.Controllers
                 string uniqueFileName = FileUploadSecurity.CreateSafeFileName(Image);
                 string filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                using (var fileStream = new FileStream(filePath, FileMode.CreateNew))
                 {
                     await Image.CopyToAsync(fileStream);
                 }
@@ -481,6 +473,7 @@ namespace JQuery_ECommerceAss.Controllers
             existingProduct.Quantity = Quantity;
             existingProduct.ProductStatus = Status.Pending;
 
+            string? replacedImages = null;
             if (Image != null && Image.Length > 0)
             {
                 if (!FileUploadSecurity.IsSafeImage(Image))
@@ -489,14 +482,7 @@ namespace JQuery_ECommerceAss.Controllers
                     return RedirectToAction(nameof(ManageProducts));
                 }
 
-                if (!string.IsNullOrEmpty(existingProduct.ImagePath))
-                {
-                    string oldImagePath = Path.Combine(_webHostEnvironment.WebRootPath, existingProduct.ImagePath.TrimStart('/'));
-                    if (System.IO.File.Exists(oldImagePath))
-                    {
-                        System.IO.File.Delete(oldImagePath);
-                    }
-                }
+                replacedImages = existingProduct.ImagePath;
 
                 string uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "images", "products");
                 Directory.CreateDirectory(uploadsFolder);
@@ -504,7 +490,7 @@ namespace JQuery_ECommerceAss.Controllers
                 string uniqueFileName = FileUploadSecurity.CreateSafeFileName(Image);
                 string filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                using (var fileStream = new FileStream(filePath, FileMode.CreateNew))
                 {
                     await Image.CopyToAsync(fileStream);
                 }
@@ -513,6 +499,7 @@ namespace JQuery_ECommerceAss.Controllers
             }
 
             await db.SaveChangesAsync();
+            FileUploadSecurity.DeleteStoredProductImages(_webHostEnvironment.WebRootPath, replacedImages, _logger);
 
             TempData["Success"] = "Product updated successfully! Waiting for admin approval.";
             return RedirectToAction(nameof(Dashboard));
@@ -555,17 +542,9 @@ namespace JQuery_ECommerceAss.Controllers
 
             if (product != null)
             {
-                if (!string.IsNullOrEmpty(product.ImagePath))
-                {
-                    string imagePath = Path.Combine(_webHostEnvironment.WebRootPath, product.ImagePath.TrimStart('/'));
-                    if (System.IO.File.Exists(imagePath))
-                    {
-                        System.IO.File.Delete(imagePath);
-                    }
-                }
-
                 db.Products.Remove(product);
                 db.SaveChanges();
+                FileUploadSecurity.DeleteStoredProductImages(_webHostEnvironment.WebRootPath, product.ImagePath, _logger);
                 TempData["Success"] = "Product deleted successfully!";
             }
             else
@@ -708,7 +687,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error loading customer insights: " + ex.Message });
+                _logger.LogError(ex, "Error loading customer insights.");
+                return Json(new { success = false, message = "Error loading customer insights." });
             }
         }
         // ==================== MANAGE PRODUCTS (AJAX) ====================
@@ -752,6 +732,7 @@ namespace JQuery_ECommerceAss.Controllers
                 var sellerId = Convert.ToInt32(HttpContext.Session.GetString("LoginSeller"));
                 product.SellerID = sellerId;
                 product.ProductStatus = Status.Pending;
+                product.ImagePath = null;
 
                 if (Image != null && Image.Length > 0)
                 {
@@ -766,7 +747,7 @@ namespace JQuery_ECommerceAss.Controllers
                     string uniqueFileName = FileUploadSecurity.CreateSafeFileName(Image);
                     string filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-                    using (var fileStream = new FileStream(filePath, FileMode.Create))
+                    using (var fileStream = new FileStream(filePath, FileMode.CreateNew))
                     {
                         await Image.CopyToAsync(fileStream);
                     }
@@ -781,7 +762,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error adding product: " + ex.Message });
+                _logger.LogError(ex, "Error adding product.");
+                return Json(new { success = false, message = "Error adding product." });
             }
         }
 
@@ -811,6 +793,7 @@ namespace JQuery_ECommerceAss.Controllers
                 existingProduct.Quantity = Quantity;
                 existingProduct.ProductStatus = Status.Pending;
 
+                string? replacedImages = null;
                 if (Image != null && Image.Length > 0)
                 {
                     if (!FileUploadSecurity.IsSafeImage(Image))
@@ -818,14 +801,7 @@ namespace JQuery_ECommerceAss.Controllers
                         return Json(new { success = false, message = "Only valid JPG, PNG, or WEBP images up to 5 MB are allowed." });
                     }
 
-                    if (!string.IsNullOrEmpty(existingProduct.ImagePath))
-                    {
-                        string oldImagePath = Path.Combine(_webHostEnvironment.WebRootPath, existingProduct.ImagePath.TrimStart('/'));
-                        if (System.IO.File.Exists(oldImagePath))
-                        {
-                            System.IO.File.Delete(oldImagePath);
-                        }
-                    }
+                    replacedImages = existingProduct.ImagePath;
 
                     string uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "images", "products");
                     Directory.CreateDirectory(uploadsFolder);
@@ -833,7 +809,7 @@ namespace JQuery_ECommerceAss.Controllers
                     string uniqueFileName = FileUploadSecurity.CreateSafeFileName(Image);
                     string filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-                    using (var fileStream = new FileStream(filePath, FileMode.Create))
+                    using (var fileStream = new FileStream(filePath, FileMode.CreateNew))
                     {
                         await Image.CopyToAsync(fileStream);
                     }
@@ -842,12 +818,14 @@ namespace JQuery_ECommerceAss.Controllers
                 }
 
                 await db.SaveChangesAsync();
+                FileUploadSecurity.DeleteStoredProductImages(_webHostEnvironment.WebRootPath, replacedImages, _logger);
 
                 return Json(new { success = true, message = "Product updated successfully! Waiting for admin approval." });
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error updating product: " + ex.Message });
+                _logger.LogError(ex, "Error updating product.");
+                return Json(new { success = false, message = "Error updating product." });
             }
         }
 
@@ -870,23 +848,16 @@ namespace JQuery_ECommerceAss.Controllers
                     return Json(new { success = false, message = "Product not found or access denied" });
                 }
 
-                if (!string.IsNullOrEmpty(product.ImagePath))
-                {
-                    string imagePath = Path.Combine(_webHostEnvironment.WebRootPath, product.ImagePath.TrimStart('/'));
-                    if (System.IO.File.Exists(imagePath))
-                    {
-                        System.IO.File.Delete(imagePath);
-                    }
-                }
-
                 db.Products.Remove(product);
                 db.SaveChanges();
+                FileUploadSecurity.DeleteStoredProductImages(_webHostEnvironment.WebRootPath, product.ImagePath, _logger);
 
                 return Json(new { success = true, message = "Product deleted successfully!" });
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error deleting product: " + ex.Message });
+                _logger.LogError(ex, "Error deleting product.");
+                return Json(new { success = false, message = "Error deleting product." });
             }
         }
 
@@ -922,7 +893,8 @@ namespace JQuery_ECommerceAss.Controllers
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "Error loading stats: " + ex.Message });
+                _logger.LogError(ex, "Error loading stats.");
+                return Json(new { success = false, message = "Error loading stats." });
             }
         }
 
@@ -961,7 +933,9 @@ namespace JQuery_ECommerceAss.Controllers
         private bool IsSellerLoggedIn()
         {
             var sellerId = HttpContext.Session.GetString("LoginSeller");
-            return int.TryParse(sellerId, out var id) &&
+            return User.IsInRole("Seller") &&
+                   sellerId == User.FindFirstValue(ClaimTypes.NameIdentifier) &&
+                   int.TryParse(sellerId, out var id) &&
                    db.Sellers.Any(s => s.SellerID == id &&
                        (s.SellerStatus == Status.Active || s.SellerStatus == Status.Approve));
         }
@@ -989,8 +963,8 @@ namespace JQuery_ECommerceAss.Controllers
 
         private bool IsPasswordResetVerified()
         {
-            var email = HttpContext.Session.GetString("Email");
-            var verifiedAt = HttpContext.Session.GetString("PasswordResetVerifiedAt");
+            var email = HttpContext.Session.GetString("SellerResetEmail");
+            var verifiedAt = HttpContext.Session.GetString("SellerResetVerifiedAt");
 
             return !string.IsNullOrEmpty(email) &&
                    DateTime.TryParse(
@@ -1044,10 +1018,5 @@ namespace JQuery_ECommerceAss.Controllers
             }
         }
 
-        private string GenerateOTP()
-        {
-            // Cryptographically secure OTP: System.Random is predictable and must never gate password resets.
-            return System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 999999).ToString();
-        }
     }
 }
