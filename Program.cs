@@ -36,8 +36,8 @@ builder.Services.AddDbContext<AppDbContext>
 
 builder.Services.AddSession(options =>
 {
-    //from 5 Minutes will auto expired
-    options.IdleTimeout = TimeSpan.FromMinutes(5);
+    // Aligned with the 30-minute sliding auth cookie; the original 5-minute value logged users out while their cookie was still valid.
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
 });
@@ -61,3 +61,6 @@ app.MapControllerRoute(
     pattern: "{controller=Admin}/{action=Login}/{id?}");
 
 app.Run();
+
+// Exposes the top-level Program class to the test project (required by WebApplicationFactory).
+public partial class Program { }

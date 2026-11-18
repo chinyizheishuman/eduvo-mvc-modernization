@@ -1,0 +1,38 @@
+EDUVO MVC MODERNIZATION - full project restore package
+Built: 2026-11-18
+Base: your GitHub main export (eduvo-mvc-modernization-main.zip)
+Code files: UNTOUCHED. Doc files only, listed below.
+
+WHAT IS DIFFERENT FROM YOUR UPLOADED ZIP
+1. README.md
+     replaced with the audited version. Your own sections are preserved
+     word for word. The old private walkthrough was moved out of it.
+2. docs/README-original-2026-11-18.md
+     backup of your old README. Delete it anytime.
+3. docs/demo-recording-script.md
+     walkthrough script for recording day, matches what start-demo.sh
+     actually does.
+4. CHANGES.txt
+     this file.
+
+HOW TO APPLY IN YOUR CODESPACE (about 60 seconds)
+1. In the Codespace terminal run:  git status
+   If anything is uncommitted, save it first:
+     git add -A && git commit -m "checkpoint" && git push
+2. Drag this zip into the Codespace file explorer so it lands in
+   /workspaces/eduvo-mvc-modernization
+3. Overlay it (files are at zip root, no extra folder inside):
+     unzip -o eduvo-mvc-modernization-full.zip
+     rm eduvo-mvc-modernization-full.zip
+4. Review, then save to the real cloud (GitHub):
+     git status
+     git diff
+     git add -A && git commit -m "docs: clean README, add demo script" && git push
+
+TWO WARNINGS
+- appsettings.json still contains SMTP credential fields. That is fine
+  inside your private repo, but rotate that password before the repo
+  ever goes public, and never commit real secrets.
+- GitHub Codespaces get deleted after roughly 30 days of no use. Commit
+  and push to main regularly. The GitHub repo is your real save file,
+  not the Codespace.

@@ -1,4 +1,5 @@
 # Eduvo E-Commerce Modernization
+
 ### You might be asking why.
 
 This started as an ASP.NET Core MVC e-commerce assignment I built for Eduvo Academy's DSE207 module back in 2025.
@@ -119,6 +120,8 @@ The modernization session recorded these results:
 
 These are development verification results, not proof that every application path has been tested.
 
+The build and test rows were re-verified on 18 November 2026 in an independent Linux environment using the repository snapshot with .NET SDK 8.0.428: restore succeeded, build finished with 0 warnings and 0 errors, and all 10 tests passed.
+
 ### Reproducing the build
 
 From the repository root:
@@ -139,213 +142,26 @@ The application targets .NET 8. Use a compatible runtime and provide database an
 
 The original verification environment used a runtime roll-forward workaround; the correct .NET 8 runtime is preferable for normal development.
 
-### From Codespace to recorded demonstration
+## Running the disposable demo
 
-This is the complete start-to-finish path I use for a screen recording. It is
-deliberately visible here because the demonstration should be reproducible,
-not a hidden sequence of clicks.
+The repository includes `scripts/start-demo.sh`, which automates the whole disposable demo environment:
 
-#### 1. Open a clean Codespace terminal
-
-Open the repository in a Codespace and start a terminal at the repository root:
-
-```bash
-pwd
-git status --short
-dotnet --info
-```
-
-The expected working directory is `/workspaces/eduvo-mvc-modernization`.
-Before opening a browser, establish the baseline:
-
-```bash
-dotnet restore JQuery-ECommerceAss.csproj
-dotnet build JQuery-ECommerceAss.csproj
-dotnet test Eduvo.Tests/Eduvo.Tests.csproj
-```
-
-The recorded baseline is a successful build with 0 warnings and 0 errors, and
-10 focused tests passing.
-
-The repeatable launch entry point is:
+- starts disposable SQL Server 2022 and Mailpit containers, bound only to `127.0.0.1`
+- generates a temporary SQL password used only inside those containers
+- applies the database migrations
+- seeds fictional demo accounts and a demo product, then prints the demo logins
+- starts the application on port `5067` and prints the browser URLs
+- stops and removes the containers it started when you press `Ctrl+C`
 
 ```bash
 ./scripts/start-demo.sh
 ```
 
-The script starts disposable SQL Server and Mailpit containers, generates a
-temporary SQL password, applies the database migrations, starts Eduvo on port
-`5067`, and prints the browser URLs. It stops the containers that it started
-when you press `Ctrl+C`. SQL Server is bound only to `127.0.0.1:1433`.
+The exact SQL Server and Mailpit container commands live in the script itself, so the standard path needs no Docker Compose file and no manual environment setup. Mailpit's inbox sits at `http://127.0.0.1:8025` and captures password-recovery email without sending anything to real recipients.
 
-#### 2. Start disposable services
+This is a disposable local environment, not a deployment.
 
-The database and SMTP ports remain private. I use a disposable SQL Server
-instance configured for this Codespace and apply migrations to that database
-only. This repository does not include a Docker Compose file, so the exact
-SQL Server container command depends on the disposable service setup being
-used and is not invented here.
-
-For local email capture, the tested Mailpit command is:
-
-```bash
-docker run --rm \
-  --name eduvo-mailpit \
-  -p 127.0.0.1:1025:1025 \
-  -p 127.0.0.1:8025:8025 \
-  axllent/mailpit
-```
-
-Mailpit provides SMTP at `127.0.0.1:1025` and its private inbox at
-`http://127.0.0.1:8025`. Check the inbox before starting the application:
-
-```bash
-curl -I http://127.0.0.1:8025
-```
-
-The response should be HTTP 200. If it is not, fix Mailpit before debugging
-the application.
-
-#### 3. Configure the disposable environment
-
-I provide the disposable database and SMTP settings through environment
-variables, never by committing credentials:
-
-```bash
-export ConnectionStrings__JQuery-ECommerceAss='Server=<disposable-sql-host>;Database=EduvoTest;User Id=<user>;Password=<password>;TrustServerCertificate=True'
-export Smtp__Host='127.0.0.1'
-export Smtp__Port='1025'
-export Smtp__From='no-reply@example.test'
-export Smtp__Username=''
-export Smtp__Password=''
-```
-
-The database placeholders are replaced only in the local terminal. Mailpit
-does not require SMTP authentication.
-
-#### 4. Apply migrations
-
-With the disposable SQL Server running:
-
-```bash
-dotnet ef database update --project JQuery-ECommerceAss.csproj
-```
-
-The final migration creates `CheckoutAttempts` and its unique request index.
-The demonstration database is seeded only with fictional accounts and
-products.
-
-#### 5. Start the application
-
-With the intended .NET 8 runtime:
-
-```bash
-ASPNETCORE_URLS=http://0.0.0.0:5067 \
-dotnet run --project JQuery-ECommerceAss.csproj
-```
-
-The original verification machine lacked the .NET 8 shared runtime and used
-this local compatibility workaround:
-
-```bash
-ASPNETCORE_URLS=http://0.0.0.0:5067 \
-DOTNET_ROLL_FORWARD=Major \
-dotnet run --project JQuery-ECommerceAss.csproj --no-build
-```
-
-#### 6. Open only the application port
-
-In the Codespace **Ports** panel:
-
-1. Find port `5067`.
-2. Open it in the browser for the recording.
-3. Keep SQL Server, SMTP, and Mailpit ports private.
-4. Return port `5067` to private after recording.
-
-This is temporary access to a development process, not a deployment.
-
-#### Starting URLs
-
-Use these URLs after the application starts:
-
-| Purpose | URL |
-|---|---|
-| Application starting point | `http://localhost:5067` |
-| Administrator login | `http://localhost:5067/Admin/Login` |
-| Administrator dashboard | `http://localhost:5067/Admin/Dashboard` |
-| Seller login | `http://localhost:5067/Seller/Login` |
-| Seller dashboard | `http://localhost:5067/Seller/Dashboard` |
-| Seller products | `http://localhost:5067/Seller/ManageProducts` |
-| Shopper login | `http://localhost:5067/User/Login` |
-| Shopper catalogue | `http://localhost:5067/User/Products` |
-| Shopper cart | `http://localhost:5067/User/Cart` |
-| Shopper checkout | `http://localhost:5067/User/Checkout` |
-| Shopper password reset | `http://localhost:5067/User/ForgotPassword` |
-| Shopper OTP | `http://localhost:5067/User/OTP` |
-| Seller password reset | `http://localhost:5067/Seller/ForgotPassword` |
-| Seller OTP | `http://localhost:5067/Seller/OTP` |
-| Local OTP inbox | `http://localhost:8025` |
-
-#### 7. Record the application walkthrough
-
-Begin with this explanation:
-
-> This is recovered 2025 DSE207 coursework. I kept the original MVC project
-> and modernized the highest-risk areas instead of replacing it with a new
-> application.
-
-Then show the workflow in this order:
-
-1. **Administrator:** open `/Admin/Login`, sign in, and show a protected
-   management page.
-2. **Seller:** open `/Seller/Login`, sign in, and show seller product and
-   stock management.
-3. **Shopper:** open `/User/Login`, browse the catalogue, update the cart, and
-   show promotion behavior.
-4. **Checkout:** submit the cart and explain that the server reloads prices,
-   stock, GST, and promotion eligibility instead of trusting browser totals.
-5. **Password reset:** open `/User/ForgotPassword` or
-   `/Seller/ForgotPassword`, request a reset for a fictional test account,
-   open `http://127.0.0.1:8025`, enter the captured OTP, and change the
-   password.
-6. **Verification:** show that the old password fails and the new password
-   succeeds.
-
-Do not record real credentials, email addresses, passwords, or OTP values.
-The purpose is to show the workflow and the engineering reasoning behind it.
-
-#### 8. Explain what the recording proves
-
-The recording demonstrates:
-
-- the recovered application runs in a reproducible Linux environment
-- role-protected workflows are reachable
-- checkout decisions are made server-side
-- password reset requires OTP verification
-- Mailpit captures email without contacting real recipients
-- the database and SMTP services remain disposable and private
-
-It does not prove production payment processing, complete browser coverage,
-load-tested inventory concurrency, or production deployment.
-
-#### 9. Stop and clean up
-
-When the recording is complete:
-
-1. Stop the application with `Ctrl+C`.
-2. Stop and remove only the named disposable SQL Server and Mailpit resources.
-3. Return port `5067` to private.
-4. Remove temporary environment variables from the terminal session.
-5. Confirm no secrets or service data were written to the repository.
-6. Run:
-
-```bash
-git status --short
-git diff --check
-```
-
-This gives the recording a complete ending instead of stopping at the first
-successful page.
+The complete start-to-finish screen-recording walkthrough, including a manual alternative that runs every piece by hand, lives in [`docs/demo-recording-script.md`](docs/demo-recording-script.md).
 
 ## What's still wrong with it?
 
@@ -380,9 +196,7 @@ For this project, a successful demonstration means someone can see the workflow,
 
 Not just watch an animation of a website that might or might not work.
 
-The practical demo uses a private application port and disposable local
-services. Mailpit captures reset email without sending messages to real
-recipients, and the database is disposable rather than a production system.
+The practical demo uses a private application port and disposable local services. Mailpit captures reset email without sending messages to real recipients, and the database is disposable rather than a production system.
 
 ## Why any of this matters in 2026
 
