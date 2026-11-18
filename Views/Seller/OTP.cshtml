@@ -1,104 +1,75 @@
-﻿<!-- OTP.cshtml -->
 @{
     ViewData["Title"] = "OTP Verification";
     Layout = null;
 }
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@ViewData["Title"]</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <style>
-        body {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Inter', sans-serif;
-        }
-
-        .auth-box {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 450px;
-            width: 100%;
-        }
-
-        .otp-input {
-            text-align: center;
-            font-size: 2rem;
-            letter-spacing: 10px;
-            font-weight: 700;
-        }
-    </style>
+    <link rel="stylesheet" href="~/css/auth.css" asp-append-version="true">
 </head>
-<body>
-    <div class="auth-box">
-        <div class="text-center mb-4">
-            <i class="fas fa-shield-alt fa-3x text-primary mb-3"></i>
-            <h2 class="fw-bold">OTP Verification</h2>
-            <p class="text-muted">Enter the 6-digit code sent to your email</p>
-        </div>
-
-        <div class="alert alert-success" id="successAlert" style="display: none;"></div>
-        <div class="alert alert-danger" id="errorAlert" style="display: none;"></div>
-
-        <form id="otpForm">
-            <div class="mb-3">
-                <input type="text" class="form-control otp-input" id="otpInput" name="otp" maxlength="6" placeholder="000000" required>
+<body class="auth-page">
+    <main class="auth-shell">
+        <section class="auth-card" aria-labelledby="otp-title">
+            <div class="auth-panel">
+                <div class="auth-brand">Account verification</div>
+                <h1 id="otp-title">Enter OTP</h1>
+                <p>Enter the six-digit code sent to the registered email.</p>
+                <div class="auth-alert error" id="errorAlert" role="alert"></div>
+                <div class="auth-alert success" id="successAlert" role="status"></div>
+                <form id="otpForm">
+                    @Html.AntiForgeryToken()
+                    <div class="auth-field">
+                        <label class="auth-label" for="otpInput">Six-digit code</label>
+                        <input class="auth-input auth-otp" id="otpInput" name="otp"
+                               inputmode="numeric" maxlength="6" autocomplete="one-time-code" required>
+                    </div>
+                    <button class="auth-button" type="submit">Verify code</button>
+                </form>
             </div>
-            <button type="submit" class="btn btn-primary w-100 py-3">
-                <i class="fas fa-check me-2"></i> Verify
-            </button>
-        </form>
-
-        <div class="text-center mt-3">
-            <a href="javascript:history.back()" class="text-decoration-none">Back to Login</a>
-        </div>
-    </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+        </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
     <script>
-        $('#otpInput').focus().on('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
+        $("#otpInput").on("input", function () {
+            this.value = this.value.replace(/[^0-9]/g, "");
+        }).trigger("focus");
 
-        $('#otpForm').on('submit', function(e) {
-            e.preventDefault();
-            const otp = $('#otpInput').val();
+        $("#otpForm").on("submit", function (event) {
+            event.preventDefault();
+            const otp = $("#otpInput").val();
             if (otp.length !== 6) {
-                $('#errorAlert').text('Please enter 6-digit OTP').show();
+                $("#successAlert").hide();
+                $("#errorAlert").text("Enter the full six-digit code.").show();
                 return;
             }
-
+            const button = this.querySelector("button[type=submit]");
+            button.disabled = true;
             $.ajax({
                 url: window.location.pathname,
-                type: 'POST',
-                data: { otp: otp },
-                success: function(response) {
+                type: "POST",
+                data: $(this).serialize(),
+                success: function (response) {
                     if (response.success) {
-                        $('#successAlert').text(response.message).show();
-                        setTimeout(() => window.location.href = response.redirect || '/Seller/Login', 1500);
+                        $("#errorAlert").hide();
+                        $("#successAlert").text("Code verified.").show();
+                        setTimeout(function () {
+                            window.location.href = response.redirect || '@Url.Action("Login", "Seller")';
+                        }, 500);
                     } else {
-                        $('#errorAlert').text(response.message || 'Invalid OTP').show();
-                        $('#otpInput').val('').focus();
+                        $("#successAlert").hide();
+                        $("#errorAlert").text(response.message || "Invalid OTP.").show();
+                        $("#otpInput").val("").trigger("focus");
                     }
-                }
+                },
+                error: function () {
+                    $("#errorAlert").text("The server could not verify the code.").show();
+                },
+                complete: function () { button.disabled = false; }
             });
         });
     </script>
 </body>
 </html>
-
-<!-- ========================================= -->
-<!-- ForgotPassword.cshtml -->
-
-<!-- ========================================= -->
-<!-- ChangePassword.cshtml -->

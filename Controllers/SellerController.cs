@@ -7,10 +7,15 @@ using Microsoft.EntityFrameworkCore;
 using MimeKit;
 using MailKit.Net.Smtp;
 using System.Text.Json;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 
 namespace JQuery_ECommerceAss.Controllers
 {
     [AutoValidateAntiforgeryToken]
+    [Authorize(Roles = "Seller", Policy = "SellerOnly")]
     public class SellerController : Controller
     {
         private readonly AppDbContext db;
@@ -28,6 +33,7 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== LOGIN (AJAX) ====================
+        [AllowAnonymous]
         public IActionResult Login()
         {
             if (IsSellerLoggedIn())
@@ -38,7 +44,9 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         [HttpPost]
-        public IActionResult Login(Seller seller)
+        [AllowAnonymous]
+        [HttpPost]
+        public async Task<IActionResult> Login(Seller seller)
         {
             if (string.IsNullOrWhiteSpace(seller.SellerUsername) || string.IsNullOrWhiteSpace(seller.SellerPassword))
             {
@@ -112,11 +120,13 @@ namespace JQuery_ECommerceAss.Controllers
 
             HttpContext.Session.SetString("LoginSeller", getSeller.SellerID.ToString());
             HttpContext.Session.SetString("SellerUsername", getSeller.SellerUsername ?? string.Empty);
+            await SignInAsync(getSeller);
 
             return Json(new { success = true, message = "Login successful!" });
         }
 
         // ==================== REGISTER (AJAX) ====================
+        [AllowAnonymous]
         [HttpPost]
         public IActionResult Register(string SellerUsername, string SellerEmail, string SellerPassword, string ConfirmPassword)
         {
@@ -172,6 +182,7 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== OTP ====================
+        [AllowAnonymous]
         public IActionResult OTP()
         {
             if (string.IsNullOrEmpty(HttpContext.Session.GetString("OTP")))
@@ -181,6 +192,7 @@ namespace JQuery_ECommerceAss.Controllers
             return View();
         }
 
+        [AllowAnonymous]
         [HttpPost]
         public IActionResult OTP(string otp)
         {
@@ -243,11 +255,13 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== FORGOT PASSWORD (AJAX) ====================
+        [AllowAnonymous]
         public IActionResult ForgotPassword()
         {
             return View();
         }
 
+        [AllowAnonymous]
         [HttpPost]
         public IActionResult ForgotPassword(string email)
         {
@@ -277,6 +291,7 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== CHANGE PASSWORD (AJAX) ====================
+        [AllowAnonymous]
         public IActionResult ChangePassword()
         {
             if (!IsPasswordResetVerified())
@@ -286,6 +301,7 @@ namespace JQuery_ECommerceAss.Controllers
             return View();
         }
 
+        [AllowAnonymous]
         [HttpPost]
         public IActionResult ChangePassword(string newPassword, string ConfirmNewPassword)
         {
@@ -317,9 +333,11 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== LOGOUT ====================
-        public IActionResult Logout()
+        [AllowAnonymous]
+        public async Task<IActionResult> Logout()
         {
             HttpContext.Session.Clear();
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return RedirectToAction(nameof(Login));
         }
 
@@ -948,6 +966,27 @@ namespace JQuery_ECommerceAss.Controllers
                        (s.SellerStatus == Status.Active || s.SellerStatus == Status.Approve));
         }
 
+        private async Task SignInAsync(Seller seller)
+        {
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, seller.SellerID.ToString()),
+                new Claim(ClaimTypes.Name, seller.SellerUsername ?? string.Empty),
+                new Claim(ClaimTypes.Role, "Seller")
+            };
+            var principal = new ClaimsPrincipal(
+                new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal,
+                new AuthenticationProperties
+                {
+                    IsPersistent = false,
+                    AllowRefresh = true
+                });
+        }
+
         private bool IsPasswordResetVerified()
         {
             var email = HttpContext.Session.GetString("Email");
@@ -974,9 +1013,7 @@ namespace JQuery_ECommerceAss.Controllers
             smtp.Connect(
                 GetRequiredConfiguration("Smtp:Host"),
                 GetRequiredPort("Smtp:Port"));
-            smtp.Authenticate(
-                GetRequiredConfiguration("Smtp:Username"),
-                GetRequiredConfiguration("Smtp:Password"));
+            AuthenticateIfConfigured(smtp);
             smtp.Send(new SmtpSendRequest(message), CancellationToken.None);
             smtp.Disconnect(true);
         }
@@ -994,6 +1031,17 @@ namespace JQuery_ECommerceAss.Controllers
             return int.TryParse(GetRequiredConfiguration(key), out var port)
                 ? port
                 : throw new InvalidOperationException($"Invalid SMTP port configuration: {key}");
+        }
+
+        private void AuthenticateIfConfigured(SmtpClient smtp)
+        {
+            var username = _configuration["Smtp:Username"];
+            var password = _configuration["Smtp:Password"];
+
+            if (!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password))
+            {
+                smtp.Authenticate(username, password);
+            }
         }
 
         private string GenerateOTP()

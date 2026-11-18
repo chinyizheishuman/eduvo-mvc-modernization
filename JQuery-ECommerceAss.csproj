@@ -8,6 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Eduvo.Tests/**/*.cs" />
+    <Content Remove="Eduvo.Tests/**" />
+    <EmbeddedResource Remove="Eduvo.Tests/**" />
+    <None Remove="Eduvo.Tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="MailKit" Version="5.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.11" />

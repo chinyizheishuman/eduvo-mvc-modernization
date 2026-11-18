@@ -248,7 +248,7 @@
                             </h3>
                         </div>
                         <div class="card-body">
-                            <canvas id="statusChart" style="max-height: 300px;"></canvas>
+                            <div id="statusChart" class="status-summary" aria-label="Products by status"></div>
                         </div>
                     </div>
 
@@ -259,7 +259,7 @@
                             </h3>
                         </div>
                         <div class="card-body">
-                            <canvas id="recentProductsChart" style="max-height: 300px;"></canvas>
+                            <div id="recentProductsChart" class="recent-product-summary" aria-label="Recent products by price"></div>
                         </div>
                     </div>
                 </div>
@@ -268,10 +268,7 @@
     </div>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-
     <script>
-        let statusChart, recentProductsChart;
         let allData = { products: [], users: [], sellers: [] };
         let currentDataType = '';
         let currentFilter = 'all';
@@ -281,8 +278,13 @@
             setupSearch('#productSearch', 'products');
             setupSearch('#userSearch', 'users');
             setupSearch('#sellerSearch', 'sellers');
-            setInterval(loadDashboardData, 30000);
         });
+
+        function escapeHtml(value) {
+            const element = document.createElement('div');
+            element.textContent = value == null ? '' : String(value);
+            return element.innerHTML;
+        }
 
         function getStatusInfo(status) {
             const statusMap = {
@@ -455,87 +457,35 @@
         }
 
         function updateStatCards(data) {
-            animateValue('totalProducts', 0, data.totalProducts, 1000);
-            animateValue('totalUsers', 0, data.totalUsers, 1000);
-            animateValue('totalSellers', 0, data.totalSellers, 1000);
-            animateValue('activeProducts', 0, data.activeProducts, 1000);
-        }
-
-        function animateValue(id, start, end, duration) {
-            const element = document.getElementById(id);
-            const range = end - start;
-            const increment = end > start ? 1 : -1;
-            const stepTime = Math.abs(Math.floor(duration / range));
-            let current = start;
-            if (range === 0) {
-                element.textContent = end;
-                return;
-            }
-            const timer = setInterval(function() {
-                current += increment;
-                element.textContent = current;
-                if (current == end) {
-                    clearInterval(timer);
-                }
-            }, stepTime);
+            document.getElementById('totalProducts').textContent = data.totalProducts;
+            document.getElementById('totalUsers').textContent = data.totalUsers;
+            document.getElementById('totalSellers').textContent = data.totalSellers;
+            document.getElementById('activeProducts').textContent = data.activeProducts;
         }
 
         function updateCharts(data) {
-            const statusCtx = document.getElementById('statusChart').getContext('2d');
-            if (statusChart) statusChart.destroy();
+            const statusContainer = document.getElementById('statusChart');
+            const statusTotal = data.productsByStatus.reduce((sum, item) => sum + item.count, 0);
+            statusContainer.innerHTML = data.productsByStatus.length
+                ? data.productsByStatus.map(item => {
+                    const percent = statusTotal === 0 ? 0 : Math.round(item.count / statusTotal * 100);
+                    return `<div class="status-summary-row">
+                        <div class="status-summary-label"><span>${escapeHtml(item.status)}</span><strong>${item.count}</strong></div>
+                        <div class="status-summary-track"><div class="status-summary-bar" style="width:${percent}%"></div></div>
+                    </div>`;
+                }).join('')
+                : '<p class="text-muted">No product status data.</p>';
 
-            const statusLabels = data.productsByStatus.map(s => s.status);
-            const statusCounts = data.productsByStatus.map(s => s.count);
-
-            statusChart = new Chart(statusCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: statusLabels,
-                    datasets: [{
-                        data: statusCounts,
-                        backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#6b7280', '#3b82f6'],
-                        borderWidth: 2,
-                        borderColor: '#fff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: { position: 'bottom' }
-                    }
-                }
-            });
-
-            const recentCtx = document.getElementById('recentProductsChart').getContext('2d');
-            if (recentProductsChart) recentProductsChart.destroy();
-
-            const productNames = data.recentProducts.map(p => p.productName && p.productName.length > 15 ? p.productName.substring(0, 15) + '...' : p.productName || 'N/A');
-            const productPrices = data.recentProducts.map(p => p.productPrice || 0);
-
-            recentProductsChart = new Chart(recentCtx, {
-                type: 'bar',
-                data: {
-                    labels: productNames,
-                    datasets: [{
-                        label: 'Price (RM)',
-                        data: productPrices,
-                        backgroundColor: 'rgba(37, 99, 235, 0.8)',
-                        borderColor: 'rgba(37, 99, 235, 1)',
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    scales: {
-                        y: { beginAtZero: true }
-                    },
-                    plugins: {
-                        legend: { display: false }
-                    }
-                }
-            });
+            const recentContainer = document.getElementById('recentProductsChart');
+            recentContainer.innerHTML = data.recentProducts.length
+                ? data.recentProducts.map(item => {
+                    const name = item.productName || 'Unnamed product';
+                    return `<div class="recent-product-row">
+                        <span>${escapeHtml(name)}</span>
+                        <strong>RM ${Number(item.productPrice || 0).toFixed(2)}</strong>
+                    </div>`;
+                }).join('')
+                : '<p class="text-muted">No recent products.</p>';
         }
 
         function setupSearch(inputSelector, type) {

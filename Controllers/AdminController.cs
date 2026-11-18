@@ -1,3 +1,7 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 ﻿using JQuery_ECommerceAss.Common.Enum;
 using JQuery_ECommerceAss.Common.Security;
 using JQuery_ECommerceAss.Data;
@@ -8,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace JQuery_ECommerceAss.Controllers
 {
     [AutoValidateAntiforgeryToken]
+    [Authorize(Roles = "Admin", Policy = "AdminOnly")]
     public class AdminController : Controller
     {
         private readonly AppDbContext db;
@@ -15,6 +20,7 @@ namespace JQuery_ECommerceAss.Controllers
         {
             db = _db;
         } 
+        [AllowAnonymous]
         public IActionResult Login()
         {
             if (IsAdminLoggedIn())
@@ -24,8 +30,9 @@ namespace JQuery_ECommerceAss.Controllers
             return View();
         }
 
+        [AllowAnonymous]
         [HttpPost]
-        public IActionResult Login(Admin admin)
+        public async Task<IActionResult> Login(Admin admin)
         {
             if (string.IsNullOrWhiteSpace(admin.AdminUsername) || string.IsNullOrWhiteSpace(admin.AdminPassword))
             {
@@ -66,14 +73,17 @@ namespace JQuery_ECommerceAss.Controllers
             db.SaveChanges();
 
             HttpContext.Session.SetString("LoginAdmin", getAdmin.AdminID.ToString());
+            await SignInAsync(getAdmin);
 
             return RedirectToAction(nameof(Index));
         }
 
-        public IActionResult Logout()
+        [AllowAnonymous]
+        public async Task<IActionResult> Logout()
         {
             var adminId = HttpContext.Session.GetString("LoginAdmin");
             HttpContext.Session.Clear();
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return RedirectToAction(nameof(Login));
         }
         //===========================================================================================
@@ -1514,6 +1524,27 @@ namespace JQuery_ECommerceAss.Controllers
         {
             var adminId = HttpContext.Session.GetString("LoginAdmin");
             return !string.IsNullOrEmpty(adminId);
+        }
+
+        private async Task SignInAsync(Admin admin)
+        {
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, admin.AdminID.ToString()),
+                new Claim(ClaimTypes.Name, admin.AdminUsername),
+                new Claim(ClaimTypes.Role, "Admin")
+            };
+            var principal = new ClaimsPrincipal(
+                new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal,
+                new AuthenticationProperties
+                {
+                    IsPersistent = false,
+                    AllowRefresh = true
+                });
         }
 
         private bool ProductExists(int id)

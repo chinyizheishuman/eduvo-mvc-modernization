@@ -18,10 +18,25 @@ namespace JQuery_ECommerceAss.Data
         public DbSet<Cart> Carts { get; set; }
         public DbSet<Promotion> Promotions { get; set; }
         public DbSet<UserPromotion> UserPromotions { get; set; }
+        public DbSet<CheckoutAttempt> CheckoutAttempts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<Cart>().Property(c => c.Price).HasPrecision(18, 2);
+            modelBuilder.Entity<Cart>().Property(c => c.Quantity).HasPrecision(18, 2);
+            modelBuilder.Entity<Product>().Property(p => p.UnitPrice).HasPrecision(18, 2);
+            modelBuilder.Entity<Promotion>().Property(p => p.DiscountPercentage).HasPrecision(18, 2);
+            modelBuilder.Entity<Promotion>().Property(p => p.MaxDiscountAmount).HasPrecision(18, 2);
+            modelBuilder.Entity<Promotion>().Property(p => p.MinPurchaseAmount).HasPrecision(18, 2);
+            modelBuilder.Entity<TransactionHis>().Property(t => t.Amount).HasPrecision(18, 2);
+            modelBuilder.Entity<TransactionHis>().Property(t => t.GstAmount).HasPrecision(18, 2);
+            modelBuilder.Entity<TransactionHis>().Property(t => t.Promotion).HasPrecision(18, 2);
+            modelBuilder.Entity<TransactionHis>().Property(t => t.SubtotalAmount).HasPrecision(18, 2);
+            modelBuilder.Entity<CheckoutAttempt>()
+                .HasIndex(attempt => attempt.RequestId)
+                .IsUnique();
+
             modelBuilder
                 .Entity<User>()
                 .Property(u => u.UserStatus)

@@ -1,566 +1,432 @@
-# eduvo-mvc-modernization
+# Eduvo E-Commerce Modernization
+### You might be asking why.
 
-Private staging repository for restoring and modernizing original Eduvo DSE207
-ASP.NET Core MVC coursework.
+This started as an ASP.NET Core MVC e-commerce assignment I built for Eduvo Academy's DSE207 module back in 2025.
 
-## Current status
+A year later, I found myself looking through the source code again.
 
-| Area | Verified status |
+A lot had changed since I originally worked on it. AI coding tools had become part of almost every development conversation. Job listings were asking students to know increasingly broad stacks, sometimes with experience requirements that didn't seem to belong in an internship advertisement.
+
+And somewhere in all of that, I still had this old project sitting around.
+
+I could have generated a new application, put a modern interface on it, and called it a portfolio project.
+
+Instead, I wanted to find out something else:
+
+**Could I take software I'd already written, understand what was wrong with it, and make it genuinely better?**
+
+That's what this repository is about.
+
+---
+
+## The original project
+
+The application was built around three roles:
+
+- **Administrator:** Account management, product administration, and user status.
+- **Seller:** Product listings, inventory, and catalogue management.
+- **Shopper:** Product browsing, shopping cart, promotions, checkout, and transaction history.
+
+It uses C#, ASP.NET Core MVC, Razor views, Entity Framework Core, SQL Server, JavaScript, and jQuery.
+
+It was coursework. It wasn't designed to become Amazon, it's just a look back on whether humans could still really code, engineer, imagine.
+
+But it was a real application with interconnected workflows, a database, authentication, and business logic. That made it worth revisiting for me personally.
+
+## What I found when I came back
+
+The original code had the sort of problems that are easy to overlook when you're focused on finishing an assignment.
+
+Password handling needed attention. Some authorization decisions relied on session state. Checkout trusted information that should have been recalculated by the server. The application also needed better protection against repeated requests and inconsistent database updates.
+
+Getting everything to compile wasn't going to answer those problems.
+
+I wanted to see whether the application could behave correctly when the input was wrong, a request was repeated, or a user tried to perform an action outside their role.
+
+That became the focus of the modernization.
+
+## What changed
+
+| Area | Work completed during modernization |
 |---|---|
-| Target framework | `net8.0` |
-| Available SDK | .NET SDK `10.0.403` |
-| Restore | Succeeds |
-| Build | Succeeds |
-| Compiler warnings | `0` |
-| Compiler errors | `0` |
-| Vulnerable NuGet packages | None reported by the configured source |
-| Application execution | Not run |
-| Database access | Not attempted |
-| Git commit, push, publish, and deploy | Not performed |
+| Password security | PBKDF2-SHA256 hashing, salted passwords, legacy-password upgrades |
+| Account recovery | OTP verification, expiring reset authorization, configurable email delivery |
+| Authentication | Cookie authentication and role policies alongside legacy session compatibility |
+| Checkout | Server-side calculation of product prices, discounts, tax, and final totals |
+| Data consistency | Transactional checkout and persisted duplicate-request protection |
+| Authorization | Seller ownership checks, account status checks, and antiforgery protection |
+| Uploads | Generated filenames and file-signature checks |
+| Testing | Focused automated tests for password, pricing, promotion, and upload logic |
 
-This repository contains recovered coursework. The modernization work is kept
-small and traceable so the original project identity and provenance remain clear.
+These changes didn't turn the application into a finished commercial platform.
 
-## Scope and evidence rules
+They made the existing application easier to reason about, test, and improve.
 
-The audit and verification were based on repository files and local commands.
-The application was not started. No external database was contacted. Secret
-values are not reproduced in this document. No claim is made about behavior that
-was not visible in source or verified by a safe local command.
+And importantly, they didn't require throwing away the entire original project.
 
-The original source remains in place. Changes are limited to security hardening,
-warning cleanup, dependency updates, and this documentation.
+## The engineering behind it
 
-## Step 1: Repository inventory
-
-### Project and framework
-
-- Project file: `JQuery-ECommerceAss.csproj`
-- SDK-style ASP.NET Core web project
-- Target framework: `net8.0`
-- Nullable reference types enabled
-- Implicit usings enabled
-- No `global.json` was found
-- Root namespace: `JQuery_ECommerceAss`
-
-### Dependencies
-
-Current direct package references in `JQuery-ECommerceAss.csproj`:
-
-- MailKit `5.0.0`
-- MimeKit `5.0.0`
-- Microsoft.EntityFrameworkCore `9.0.11`
-- Microsoft.EntityFrameworkCore.SqlServer `9.0.11`
-- Microsoft.EntityFrameworkCore.Tools `9.0.11`
-
-### Application areas
-
-- `Controllers/`
-  - `AdminController.cs`
-  - `SellerController.cs`
-  - `UserController.cs`
-  - `HomeController.cs`
-- `Models/`
-  - administrators, sellers, users, products, carts, promotions,
-    user promotions, transactions, and the error view model
-- `Data/AppDbContext.cs`
-- `Migrations/`
-  - two initial migrations and the EF model snapshot
-- `Views/`
-  - administrator, seller, user, home, and shared Razor views
-- `wwwroot/`
-  - CSS, JavaScript, local library assets, product images, and favicon
-- `Common/Enum/Status.cs`
-- `Common/Security/PasswordSecurity.cs`
-
-### External services and local configuration
-
-- SQL Server is configured through the connection string in `appsettings.json`
-  and points to local `localhost\SQLEXPRESS`.
-- Email uses Gmail SMTP through MailKit.
-- SMTP host, port, sender, username, and password are configuration keys.
-  Credentials must be supplied through local secrets or environment configuration.
-- `JQuery-ECommerceAss.csproj.user` contains IDE scaffolding metadata only.
-- `Properties/launchSettings.json` contains development launch URLs.
-- `jem.py` is a filesystem-listing utility.
-
-No student-specific records were found during the inventory.
-
-## Step 2: Architecture and implemented workflows
-
-### Application startup
-
-`Program.cs` registers MVC, `AppDbContext` with SQL Server, and five-minute
-session state. The pipeline enables static files, routing, session, and
-authorization middleware. ASP.NET Core Identity and policy-based role
-authorization are not registered. The default route opens `Admin/Login`.
-
-### Administrator management
-
-`Controllers/AdminController.cs` contains:
-
-- Administrator login and session creation in `Login`.
-- Product status management in `ChangeStatus`.
-- User listing, editing, status changes, and deletion.
-- Seller listing, editing, status changes, and deletion.
-- AJAX endpoints for product, user, seller, and dashboard operations.
-
-The existing access model is manual session checking through
-`IsAdminLoggedIn()`. It is not ASP.NET Core role authorization.
-
-### Seller product management
-
-`Controllers/SellerController.cs` contains:
-
-- Seller registration, OTP verification, login, suspension, and password reset.
-- Dashboard and product listing filtered by the logged-in seller ID.
-- Product creation, editing, deletion, image upload, and status reset to pending.
-- Customer insight calculations.
-- AJAX versions of product operations.
-
-Seller product operations check seller ownership in the recovered workflow.
-Validation and antiforgery protection were not consistently present.
-
-### Shopper catalogue and cart
-
-`Controllers/UserController.cs` contains:
-
-- Catalogue filtering to active or approved products with stock.
-- Cart display, add, remove, and quantity update operations.
-- Basic stock checks when adding or updating cart items.
-- Session-based user login and profile operations.
-
-The cart stores a copied price. Checkout still requires a server-side pricing
-redesign because client-submitted totals remain part of the current workflow.
-
-### Promotions and pricing
-
-`UserController.cs` contains promotion assignment, listing, application, removal,
-minimum purchase checks, percentage discounts, and maximum discount limits.
-
-The recovered source also contains `TestPromotions` and
-`CreateTestPromotions`, which are diagnostic actions without the same access
-checks used by normal user operations.
-
-### Checkout and transaction history
-
-`UserController.cs` contains checkout display, payment processing, seller-grouped
-transaction creation, inventory decrement, promotion consumption, cart removal,
-confirmation email, and transaction history.
-
-The current checkout still needs a later focused improvement for authoritative
-server-side totals, database transaction boundaries, concurrency handling, and
-duplicate request protection.
-
-## Step 3: Original audit findings
-
-These findings describe the recovered state before the remediation work.
-
-| # | Severity | Evidence | Finding | Confidence |
-|---|---|---|---|---|
-| 1 | Critical | `Controllers/UserController.cs`, `Controllers/SellerController.cs` | SMTP credentials were hardcoded in controller source. | 10/10 |
-| 2 | Critical | `Models/User.cs`, `Models/Seller.cs`, `Models/Admin.cs`, `Models/TransactionHis.cs` | Passwords were stored and compared as plaintext, and checkout persisted submitted card numbers. | 10/10 |
-| 3 | High | `Controllers/UserController.cs`, `Views/User/Checkout.cshtml` | Checkout accepted client-controlled subtotal, GST, and promotion values. | 10/10 |
-| 4 | High | `Controllers/UserController.cs` | Checkout had no explicit transaction, concurrency control, or idempotency key. | 9/10 |
-| 5 | High | `Controllers/SellerController.cs` | Seller upload paths used client filenames without equivalent basename sanitization. | 9/10 |
-| 6 | High | `Controllers/UserController.cs` | Diagnostic promotion actions were publicly routable without an apparent login or role check. | 9/10 |
-
-Other verified observations from the recovered source:
-
-- Most state-changing AJAX endpoints did not show antiforgery validation.
-- Models had limited server-side validation attributes.
-- Custom session checks were used instead of framework authentication and roles.
-- The initial migration contains a card-number column.
-- Local SQL Server configuration is development-specific and contains no database
-  password in the checked file.
-
-## Step 4: Applied changes
-
-### 4.1 Password protection
-
-Added `Common/Security/PasswordSecurity.cs`.
-
-Implementation decisions:
-
-1. PBKDF2-SHA256 is used with a random per-password salt.
-2. The stored format includes the algorithm marker, iteration count, salt, and hash.
-3. Hash comparison uses constant-time comparison.
-4. New registrations use hashes.
-5. Password changes use hashes.
-6. Existing legacy plaintext records can authenticate once and are upgraded to
-   hashes after successful login.
-7. Invalid hash formats fail closed.
-
-This preserves access to recovered coursework data while moving credentials
-toward a safer representation. A future migration should add explicit password
-format documentation and complete the transition to framework authentication.
-
-Updated files:
-
-- `Controllers/AdminController.cs`
-- `Controllers/SellerController.cs`
-- `Controllers/UserController.cs`
-- `Common/Security/PasswordSecurity.cs`
-
-### 4.2 SMTP secret removal
-
-Removed literal SMTP credentials from both controllers. Email now reads:
-
-- `Smtp:Host`
-- `Smtp:Port`
-- `Smtp:From`
-- `Smtp:Username`
-- `Smtp:Password`
-
-Missing or blank required values throw an explicit configuration error instead
-of silently using an unsafe fallback. The actual values are not stored in this
-repository.
-
-MailKit 5 changed the send API. The controllers now construct
-`SmtpSendRequest` explicitly.
-
-Updated files:
-
-- `Controllers/UserController.cs`
-- `Controllers/SellerController.cs`
-- `appsettings.json`
-
-### 4.3 Card-number removal
-
-Removed `CardNumber` from the transaction model, checkout transaction creation,
-and transaction-history display. The history view now reports that payment was
-processed securely without displaying card fragments.
-
-The historical EF migration still contains the old database column. This is
-intentional provenance preservation. A future database migration must remove or
-retire that column before any real database deployment.
-
-Updated files:
-
-- `Models/TransactionHis.cs`
-- `Controllers/UserController.cs`
-- `Views/User/TransactionHistory.cshtml`
-
-### 4.4 Warning and nullable-flow cleanup
-
-Resolved the compiler warnings by making narrow, behavior-preserving changes:
-
-- Guarded nullable session values before storing or using them.
-- Checked deserialization results before registration completion.
-- Handled missing cart products.
-- Handled missing sellers before seller dashboard access.
-- Checked nullable promotion navigation data.
-- Used null-safe date access after filtering.
-- Removed unused exception variables where the existing response already handled
-  the error.
-
-The cleanup did not redesign the application or suppress warnings globally.
-
-Updated files:
-
-- `Controllers/AdminController.cs`
-- `Controllers/SellerController.cs`
-- `Controllers/UserController.cs`
-- `Models/TransactionHis.cs`
-
-### 4.5 Dependency update
-
-MailKit and MimeKit were upgraded from the recovered 4.x versions to `5.0.0`.
-The necessary MailKit 5 send-request API change was applied.
-
-This removed the previously reported package advisories from the current
-configured NuGet source.
-
-Updated file:
-
-- `JQuery-ECommerceAss.csproj`
-
-## Step 5: Verification record
-
-The application was not run and no database was contacted.
-
-### Environment check
+The application still follows its original MVC architecture.
 
 ```text
+                 Browser
+                    |
+            Razor Views / JS
+                    |
+             MVC Controllers
+                    |
+             Application Logic
+                    |
+            Entity Framework
+                    |
+                SQL Server
+```
+
+The development environment also uses Mailpit to capture password-recovery emails without sending them to actual recipients.
+
+For the checkout flow, the important change is that the server makes the final decisions about prices, stock, promotions, and totals.
+
+A browser can display a price. It shouldn't get to decide what the database records as the final price.
+
+The modernization also introduces persisted checkout request identifiers to help prevent the same submission from creating duplicate transactions.
+
+## Why GitHub Codespaces?
+
+Partly because I didn't want to rebuild an entire old Windows development environment just to recover an assignment.
+
+My daily computer is a Windows business laptop. The original project came from an older development setup, and I wanted something more reproducible than depending on whichever machine happened to have SQL Server installed.
+
+Codespaces gave me a Linux development environment where I could work with the .NET SDK, build the application, and test it against disposable services.
+
+It also meant I could keep the database and mail-testing services isolated from anything public.
+
+It isn't a production deployment, and I'm not presenting it as one.
+
+## What actually works?
+
+The modernization session recorded these results:
+
+| Verification | Recorded result |
+|---|---|
+| .NET 8 application build | Passed, 0 warnings and 0 errors |
+| Automated tests | 10 focused tests passed |
+| Database migrations | Applied to disposable SQL Server |
+| Password reset | OTP captured through Mailpit |
+| Authentication | Password upgrade and reset scenarios checked |
+| Protected routes | Unauthenticated access rejected in tested scenarios |
+| Duplicate checkout | Persisted request uniqueness constraint added |
+| Production deployment | Not performed |
+
+These are development verification results, not proof that every application path has been tested.
+
+### Reproducing the build
+
+From the repository root:
+
+```bash
+dotnet restore JQuery-ECommerceAss.csproj
+dotnet build JQuery-ECommerceAss.csproj
+dotnet test Eduvo.Tests/Eduvo.Tests.csproj
+```
+
+To run the application after configuring the development database:
+
+```bash
+dotnet run --project JQuery-ECommerceAss.csproj
+```
+
+The application targets .NET 8. Use a compatible runtime and provide database and SMTP configuration through development settings or environment variables.
+
+The original verification environment used a runtime roll-forward workaround; the correct .NET 8 runtime is preferable for normal development.
+
+### From Codespace to recorded demonstration
+
+This is the complete start-to-finish path I use for a screen recording. It is
+deliberately visible here because the demonstration should be reproducible,
+not a hidden sequence of clicks.
+
+#### 1. Open a clean Codespace terminal
+
+Open the repository in a Codespace and start a terminal at the repository root:
+
+```bash
+pwd
+git status --short
 dotnet --info
 ```
 
-Observed SDK:
+The expected working directory is `/workspaces/eduvo-mvc-modernization`.
+Before opening a browser, establish the baseline:
 
-```text
-10.0.403
-```
-
-### Restore
-
-```text
-dotnet restore JQuery-ECommerceAss.csproj --packages /tmp/eduvo-nuget
-```
-
-Result: restore succeeded.
-
-### Build
-
-```text
-dotnet build JQuery-ECommerceAss.csproj --no-restore
-```
-
-Result:
-
-```text
-Build succeeded.
-0 Warning(s)
-0 Error(s)
-```
-
-The same result was verified with:
-
-```text
-dotnet build JQuery-ECommerceAss.csproj
-```
-
-### Package vulnerability check
-
-```text
-dotnet list JQuery-ECommerceAss.csproj package --vulnerable --include-transitive
-```
-
-Result:
-
-```text
-The given project JQuery-ECommerceAss has no vulnerable packages given the current sources.
-```
-
-### Diff hygiene
-
-`git diff --check` completed without whitespace errors. Generated `bin/` and
-`obj/` directories are build outputs and are not source changes.
-
-## Step 6: Current limitations and next work
-
-The clean build is not equivalent to a complete security review. The following
-items remain for later, separately testable work:
-
-1. Recalculate checkout totals from database state and ignore hidden form totals.
-2. Add an explicit checkout transaction, stock concurrency control, and request
-   idempotency.
-3. Add antiforgery protection to state-changing MVC and AJAX actions.
-4. Replace manual session authentication with framework authentication and roles.
-5. Remove or restrict diagnostic promotion actions.
-6. Validate upload extension, content, size, generated names, and canonical path.
-7. Add a migration to retire the historical card-number database column.
-8. Add automated tests for password hashing, checkout calculation, authorization,
-   and promotion eligibility.
-9. Add Codespaces and CI instructions after a safe local test strategy exists.
-
-## Step 7: Reproducible recovery commands
-
-Use these commands from the repository root:
-
-```text
-dotnet restore JQuery-ECommerceAss.csproj --packages /tmp/eduvo-nuget
-dotnet build JQuery-ECommerceAss.csproj --no-restore
-dotnet list JQuery-ECommerceAss.csproj package --vulnerable --include-transitive
-```
-
-If the IDE turns the project red after generated files are cleaned, restore first.
-The restore recreates `obj/project.assets.json`, which the build requires:
-
-```text
+```bash
 dotnet restore JQuery-ECommerceAss.csproj
-dotnet build JQuery-ECommerceAss.csproj --no-restore
+dotnet build JQuery-ECommerceAss.csproj
+dotnet test Eduvo.Tests/Eduvo.Tests.csproj
 ```
 
-Do not run the application or apply migrations until the SQL Server configuration,
-SMTP configuration, authentication design, and checkout integrity work have been
-reviewed.
+The recorded baseline is a successful build with 0 warnings and 0 errors, and
+10 focused tests passing.
 
-## Handoff
+The repeatable launch entry point is:
 
-The latest existing commit message was verified without a
-`Co-authored-by: Copilot` trailer. This README handoff note is an uncommitted
-documentation update. No history rewrite is required.
+```bash
+./scripts/start-demo.sh
+```
 
-## Current deep review
+The script starts disposable SQL Server and Mailpit containers, generates a
+temporary SQL password, applies the database migrations, starts Eduvo on port
+`5067`, and prints the browser URLs. It stops the containers that it started
+when you press `Ctrl+C`. SQL Server is bound only to `127.0.0.1:1433`.
 
-Review date: 2026-11-17. This section records the latest read-only review after
-the modernization commit. The project builds cleanly, but build success does not
-prove that authentication, authorization, money, inventory, or file handling are
-safe at runtime.
+#### 2. Start disposable services
 
-### Critical findings still open
+The database and SMTP ports remain private. I use a disposable SQL Server
+instance configured for this Codespace and apply migrations to that database
+only. This repository does not include a Docker Compose file, so the exact
+SQL Server container command depends on the disposable service setup being
+used and is not invented here.
 
-| Priority | Evidence | What is wrong | Why it matters | Required fix |
-|---|---|---|---|---|
-| Critical | `Controllers/UserController.cs` reset flow around lines 350-403; `Controllers/SellerController.cs` around lines 248-308 | Password reset stores the requested email in session before OTP verification. The change-password action authorizes using that email without requiring an OTP-success marker. | An attacker can request a reset for another account and set a new password without knowing the OTP. | Use a single-use, short-lived, server-side reset token created only after verified OTP, or store the email only after successful OTP verification. |
-| Critical | `Controllers/UserController.cs` `ProcessPayment` around lines 628-728; `Views/User/Checkout.cshtml` payment form | `subtotal`, `gst`, and `promotion` are accepted from hidden browser fields and used in transaction amounts, seller allocation, and email totals. | An authenticated shopper can alter totals and create falsified financial records. No trusted payment verification exists. | Recalculate all totals from current database prices, quantities, and validated promotion state. Add a trusted payment provider and atomic order commit. |
+For local email capture, the tested Mailpit command is:
 
-### High and medium findings still open
+```bash
+docker run --rm \
+  --name eduvo-mailpit \
+  -p 127.0.0.1:1025:1025 \
+  -p 127.0.0.1:8025:8025 \
+  axllent/mailpit
+```
 
-| Severity | Evidence | Finding | Why it matters | Required fix |
-|---|---|---|---|---|
-| High | `Controllers/UserController.cs` diagnostic promotion actions around lines 862-1052 | Public actions can inspect another user, assign promotions, and create test promotions. | Unauthenticated users can read or mutate business data. | Remove diagnostic actions or restrict them to development and administrator authorization with antiforgery protection. |
-| High | `Controllers/SellerController.cs` product upload actions around lines 375-400 and 776-800; `Controllers/AdminController.cs` upload actions around lines 709-804 | Uploads accept arbitrary file content into the public `wwwroot` tree. Client-side `accept="image/*"` is not server validation. | HTML, SVG, or script content can become publicly served under the application origin. | Validate size, extension, MIME, and file signature. Generate controlled names and store files outside the public tree or serve through a constrained image endpoint. |
-| Medium | `Controllers/SellerController.cs` privileged actions around lines 815-920 | Seller checks only that a login session exists. A seller suspended after login can retain access until session expiry. | Account suspension is not enforced consistently. | Resolve the seller on each privileged request, require active or approved status, and clear sessions after suspension. |
+Mailpit provides SMTP at `127.0.0.1:1025` and its private inbox at
+`http://127.0.0.1:8025`. Check the inbox before starting the application:
 
-### Remediation status
+```bash
+curl -I http://127.0.0.1:8025
+```
 
-| Area | Status |
+The response should be HTTP 200. If it is not, fix Mailpit before debugging
+the application.
+
+#### 3. Configure the disposable environment
+
+I provide the disposable database and SMTP settings through environment
+variables, never by committing credentials:
+
+```bash
+export ConnectionStrings__JQuery-ECommerceAss='Server=<disposable-sql-host>;Database=EduvoTest;User Id=<user>;Password=<password>;TrustServerCertificate=True'
+export Smtp__Host='127.0.0.1'
+export Smtp__Port='1025'
+export Smtp__From='no-reply@example.test'
+export Smtp__Username=''
+export Smtp__Password=''
+```
+
+The database placeholders are replaced only in the local terminal. Mailpit
+does not require SMTP authentication.
+
+#### 4. Apply migrations
+
+With the disposable SQL Server running:
+
+```bash
+dotnet ef database update --project JQuery-ECommerceAss.csproj
+```
+
+The final migration creates `CheckoutAttempts` and its unique request index.
+The demonstration database is seeded only with fictional accounts and
+products.
+
+#### 5. Start the application
+
+With the intended .NET 8 runtime:
+
+```bash
+ASPNETCORE_URLS=http://0.0.0.0:5067 \
+dotnet run --project JQuery-ECommerceAss.csproj
+```
+
+The original verification machine lacked the .NET 8 shared runtime and used
+this local compatibility workaround:
+
+```bash
+ASPNETCORE_URLS=http://0.0.0.0:5067 \
+DOTNET_ROLL_FORWARD=Major \
+dotnet run --project JQuery-ECommerceAss.csproj --no-build
+```
+
+#### 6. Open only the application port
+
+In the Codespace **Ports** panel:
+
+1. Find port `5067`.
+2. Open it in the browser for the recording.
+3. Keep SQL Server, SMTP, and Mailpit ports private.
+4. Return port `5067` to private after recording.
+
+This is temporary access to a development process, not a deployment.
+
+#### Starting URLs
+
+Use these URLs after the application starts:
+
+| Purpose | URL |
 |---|---|
-| Hardcoded SMTP credentials | Fixed in the committed baseline |
-| New password hashing | Implemented with PBKDF2-SHA256 |
-| Legacy password transition | Temporary compatibility remains; upgrade occurs after successful login |
-| Card-number persistence in current model and checkout code | Removed |
-| Historical card-number migration column | Still present and requires a future migration |
-| Password reset OTP authorization | Still open |
-| Server-side checkout totals | Still open |
-| Checkout transaction and idempotency | Still open |
-| Diagnostic promotion access control | Still open |
-| Upload validation | Still open |
-| Framework authorization and antiforgery coverage | Still open |
+| Application starting point | `http://localhost:5067` |
+| Administrator login | `http://localhost:5067/Admin/Login` |
+| Administrator dashboard | `http://localhost:5067/Admin/Dashboard` |
+| Seller login | `http://localhost:5067/Seller/Login` |
+| Seller dashboard | `http://localhost:5067/Seller/Dashboard` |
+| Seller products | `http://localhost:5067/Seller/ManageProducts` |
+| Shopper login | `http://localhost:5067/User/Login` |
+| Shopper catalogue | `http://localhost:5067/User/Products` |
+| Shopper cart | `http://localhost:5067/User/Cart` |
+| Shopper checkout | `http://localhost:5067/User/Checkout` |
+| Shopper password reset | `http://localhost:5067/User/ForgotPassword` |
+| Shopper OTP | `http://localhost:5067/User/OTP` |
+| Seller password reset | `http://localhost:5067/Seller/ForgotPassword` |
+| Seller OTP | `http://localhost:5067/Seller/OTP` |
+| Local OTP inbox | `http://localhost:8025` |
 
-### Why the clean build is not enough
+#### 7. Record the application walkthrough
 
-The compiler verifies syntax, types, Razor compilation, and package resolution.
-It cannot verify that a browser has not changed a hidden price field, that an OTP
-was actually checked before a password reset, that two checkout requests cannot
-spend the same stock, or that an uploaded file is safe to serve. These are
-runtime security and business-integrity properties and require focused tests and
-design changes.
+Begin with this explanation:
 
-### Latest verification
+> This is recovered 2025 DSE207 coursework. I kept the original MVC project
+> and modernized the highest-risk areas instead of replacing it with a new
+> application.
 
-The following read-only checks were run after the deep review:
+Then show the workflow in this order:
 
-```text
-dotnet build JQuery-ECommerceAss.csproj
-Build succeeded. 0 Warning(s), 0 Error(s)
+1. **Administrator:** open `/Admin/Login`, sign in, and show a protected
+   management page.
+2. **Seller:** open `/Seller/Login`, sign in, and show seller product and
+   stock management.
+3. **Shopper:** open `/User/Login`, browse the catalogue, update the cart, and
+   show promotion behavior.
+4. **Checkout:** submit the cart and explain that the server reloads prices,
+   stock, GST, and promotion eligibility instead of trusting browser totals.
+5. **Password reset:** open `/User/ForgotPassword` or
+   `/Seller/ForgotPassword`, request a reset for a fictional test account,
+   open `http://127.0.0.1:8025`, enter the captured OTP, and change the
+   password.
+6. **Verification:** show that the old password fails and the new password
+   succeeds.
 
-dotnet list JQuery-ECommerceAss.csproj package --vulnerable --include-transitive
-The given project JQuery-ECommerceAss has no vulnerable packages given the current sources.
+Do not record real credentials, email addresses, passwords, or OTP values.
+The purpose is to show the workflow and the engineering reasoning behind it.
+
+#### 8. Explain what the recording proves
+
+The recording demonstrates:
+
+- the recovered application runs in a reproducible Linux environment
+- role-protected workflows are reachable
+- checkout decisions are made server-side
+- password reset requires OTP verification
+- Mailpit captures email without contacting real recipients
+- the database and SMTP services remain disposable and private
+
+It does not prove production payment processing, complete browser coverage,
+load-tested inventory concurrency, or production deployment.
+
+#### 9. Stop and clean up
+
+When the recording is complete:
+
+1. Stop the application with `Ctrl+C`.
+2. Stop and remove only the named disposable SQL Server and Mailpit resources.
+3. Return port `5067` to private.
+4. Remove temporary environment variables from the terminal session.
+5. Confirm no secrets or service data were written to the repository.
+6. Run:
+
+```bash
+git status --short
+git diff --check
 ```
 
-The application was not run. No database or external service was contacted. The
-latest commit remains the user's commit, and the README changes in this section
-remain uncommitted until explicitly reviewed.
+This gives the recording a complete ending instead of stopping at the first
+successful page.
 
-The current worktree also shows generated `bin/` and `obj/` files as modified
-because those directories are tracked by the existing commit. This is a source
-hygiene problem: builds should generate ignored artifacts, not modify tracked
-dependencies, binaries, symbols, and intermediate files. Remove them from
-version control in a separate, explicitly reviewed cleanup commit. Do not mix
-that cleanup with application security changes.
+## What's still wrong with it?
 
-## Latest implementation update
+Quite a few things.
 
-The two highest-impact open flaws from the deep review were implemented after
-the review.
+Some recovered workflows still use session-based authorization. The application hasn't been fully migrated to ASP.NET Core Identity.
 
-### Password reset now requires verified OTP
+Inventory concurrency needs stronger testing with competing requests. There isn't a complete automated browser or accessibility test suite. Uploaded files aren't malware-scanned or re-encoded.
 
-User and seller reset flows now set a short-lived verification timestamp only
-after the OTP is accepted. Both the reset page and the password-change POST
-require that timestamp and the reset email. The timestamp expires after ten
-minutes and is removed after a successful password change.
+There's also no real payment provider. Checkout remains a coursework workflow rather than a live payment system.
 
-This closes the previous session-only authorization gap. Knowing or setting an
-email session value is no longer sufficient to change a password.
+I could hide all that behind a polished interface and a few screenshots, but it would give the wrong impression of the engineering work.
 
-### Checkout totals are now server-authoritative
+These aren't accomplishments. They're the remaining problems.
 
-The checkout POST still accepts the historical form signature for compatibility,
-but it no longer trusts submitted subtotal, GST, promotion, or promo-code values.
-It now:
+## A demonstration worth showing
 
-1. Reloads each product from the database.
-2. Rejects missing products, missing sellers, invalid quantities, and insufficient
-   stock.
-3. Uses current database product prices for the subtotal.
-4. Calculates GST on the server.
-5. Reloads the selected promotion for the logged-in user.
-6. Revalidates promotion status, dates, usage state, and minimum purchase.
-7. Applies the promotion cap on the server.
-8. Allocates seller totals from authoritative values.
-9. Uses authoritative totals for transaction records and email totals.
-10. Removes browser-controlled total fields from the checkout form and tells the
-    user that totals are recalculated securely.
+A useful demonstration should show more than a landing page.
 
-This is a meaningful full-stack improvement because the browser is now a display
-client, not the authority for money or discount values.
+It should walk through the actual application:
 
-Verification after this update:
+1. Administrator authentication and access to protected pages.
+2. Seller product creation and inventory management.
+3. Shopper browsing, cart updates, and promotions.
+4. Checkout with totals recalculated by the server.
+5. Password recovery using a locally captured OTP.
+6. The corresponding database changes and automated tests.
 
-```text
-dotnet build JQuery-ECommerceAss.csproj
-Build succeeded. 0 Warning(s), 0 Error(s)
-```
+Each demonstrated behavior should be reproducible using sample accounts and fictional products.
 
-The application and database were not run. These changes remain uncommitted.
+For this project, a successful demonstration means someone can see the workflow, inspect the source code, and understand how it was tested.
 
-## Comprehensive hardening update
+Not just watch an animation of a website that might or might not work.
 
-The follow-up hardening pass addressed the remaining reported application
-security issues without rewriting the recovered coursework:
+The practical demo uses a private application port and disposable local
+services. Mailpit captures reset email without sending messages to real
+recipients, and the database is disposable rather than a production system.
 
-- Diagnostic promotion endpoints are marked non-actionable and are no longer
-  reachable as MVC routes.
-- Seller session checks now verify the seller still exists and is active or
-  approved, so a suspended seller cannot continue using seller workflows.
-- Seller and administrator product uploads now require a JPG, JPEG, PNG, or
-  WEBP signature and a maximum size of 5 MB. Stored filenames are generated
-  server-side and never include the client filename.
-- MVC controllers now use automatic antiforgery validation for state-changing
-  requests. The checkout form includes its antiforgery token explicitly.
-- Checkout now uses a short-lived server-issued request token, an explicit
-  EF Core database transaction, and commits database changes before sending
-  confirmation email. Submitted money values remain ignored.
-- A new migration removes the historical `CardNumber` column from deployed
-  databases. The original migration remains unchanged to preserve provenance.
+## Why any of this matters in 2026
 
-The checkout token reduces replay of a completed checkout from the same session.
-The next production-grade step would be a persisted order aggregate with a
-database uniqueness constraint and concurrency token for multi-instance,
-concurrent checkout requests. The application still uses custom session
-authorization rather than ASP.NET Core Identity, which remains a modernization
-option rather than a claim about the original coursework.
+AI can generate controllers, write tests, scaffold interfaces, and produce documentation.
 
-Verification:
+I've used AI development tools during this modernization too.
 
-```text
-dotnet build JQuery-ECommerceAss.csproj
-Build succeeded. 0 Warning(s), 0 Error(s)
+But generating code and understanding code are not the same thing.
 
-git -c core.whitespace=cr-at-eol diff --check
-Passed
-```
+A generated solution can compile and still make the wrong assumptions about authorization, pricing, database consistency, or what the application actually needs.
 
-The application was not run and no database or external service was contacted.
-No commit was created.
+The frustrating part of maintaining older software is that you don't get to start with a perfect specification. You inherit previous decisions, incomplete assumptions, and things that worked well enough at the time.
 
-## Commit readiness
+You have to investigate before you change them.
 
-The modernization is ready for a source commit when the following source-only
-files are explicitly staged:
+That's the part of software engineering I wanted this project to represent.
 
-- Controllers and views
-- Password and upload security helpers
-- The card-number cleanup migration
-- EF Core migration snapshot
-- README and `.gitignore`
+Not how fast I could generate another repository, but whether I could examine an existing one, make defensible decisions, and show the results.
 
-Generated `bin/` and `obj/` artifacts should not be included. They are build
-outputs, are already present in this repository from historical coursework,
-and remain separately tracked until an explicit repository-hygiene commit
-removes them from Git index control.
+## Where it goes from here
 
-The verified source state is:
+The next improvements are straightforward to identify, even if implementing them properly takes more work:
 
-- `dotnet build JQuery-ECommerceAss.csproj`: 0 warnings, 0 errors
-- Password resets require verified OTP state
-- Checkout totals are recalculated on the server
-- Checkout uses a session request token and EF Core transaction
-- Diagnostic promotion routes are non-actionable
-- Upload signatures and sizes are validated
-- Suspended sellers cannot retain seller session access
-- Antiforgery validation is enabled for MVC controllers
-- The historical card column has a cleanup migration
+- Integration tests around authentication, checkout, and account recovery.
+- Inventory concurrency handling and competing-request tests.
+- Removal of remaining session-only authorization decisions.
+- Browser-level testing and accessibility improvements.
+- More consistent UI behavior across administrator, seller, and shopper pages.
+- Deployment and migration verification in a controlled environment.
+
+I'm keeping the original coursework history visible while documenting the subsequent changes.
+
+This isn't a finished product dressed up as an open-source success story.
+
+It's an old application I'm trying to engineer better than I did the first time.
+
+And I think that's worth showing.
+
+---
+
+**Chin Yi Zhe**
+Eduvo Academy · DSE207 coursework (2025)
+Modernization started in 2026
+
+*C#, ASP.NET Core MVC, Entity Framework Core, SQL Server*
+
+**Status:** Active modernization. Development build and focused tests reported passing. Not production-ready.

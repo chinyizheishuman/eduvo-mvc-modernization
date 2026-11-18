@@ -1,9 +1,13 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using JQuery_ECommerceAss.Data;
 
 #nullable disable
 
 namespace JQuery_ECommerceAss.Migrations;
 
+[DbContext(typeof(AppDbContext))]
+[Migration("20260308000000_RemoveHistoricalCardNumber")]
 public partial class RemoveHistoricalCardNumber : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)

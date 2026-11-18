@@ -46,6 +46,36 @@ namespace JQuery_ECommerceAss.Migrations
                     b.ToTable("Admins");
                 });
 
+            modelBuilder.Entity("JQuery_ECommerceAss.Models.CheckoutAttempt", b =>
+                {
+                    b.Property<int>("CheckoutAttemptID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CheckoutAttemptID"));
+
+                    b.Property<DateTime>("DateTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RequestId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("CheckoutAttemptID");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique();
+
+                    b.ToTable("CheckoutAttempts");
+                });
+
             modelBuilder.Entity("JQuery_ECommerceAss.Models.Cart", b =>
                 {
                     b.Property<int>("CartID")

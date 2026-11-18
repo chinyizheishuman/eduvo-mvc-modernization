@@ -1,367 +1,59 @@
-﻿@{
-    ViewData["Title"] = "Admin Login";
+@{
+    ViewData["Title"] = "Administrator Login";
     Layout = null;
 }
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - E-Commerce Admin</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .login-container {
-            width: 100%;
-            max-width: 450px;
-        }
-
-        .login-card {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-        }
-
-        .login-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 3rem 2rem;
-            text-align: center;
-            color: white;
-        }
-
-        .login-logo {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 20px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1.5rem;
-            backdrop-filter: blur(10px);
-        }
-
-            .login-logo i {
-                font-size: 2.5rem;
-            }
-
-        .login-title {
-            font-size: 1.875rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .login-subtitle {
-            font-size: 0.9375rem;
-            opacity: 0.9;
-        }
-
-        .login-body {
-            padding: 2.5rem 2rem;
-        }
-
-        .alert {
-            padding: 1rem;
-            border-radius: 10px;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            background: #fee2e2;
-            color: #991b1b;
-            border-left: 4px solid #ef4444;
-        }
-
-            .alert i {
-                font-size: 1.25rem;
-            }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: #374151;
-            margin-bottom: 0.5rem;
-        }
-
-        .input-group {
-            position: relative;
-        }
-
-        .input-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #9ca3af;
-            font-size: 1.125rem;
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 0.875rem 1rem 0.875rem 3rem;
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 0.9375rem;
-            transition: all 0.2s;
-            font-family: inherit;
-        }
-
-            .form-control:focus {
-                outline: none;
-                border-color: #667eea;
-                box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-            }
-
-        .password-toggle {
-            position: absolute;
-            right: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #9ca3af;
-            cursor: pointer;
-            font-size: 1.125rem;
-            transition: color 0.2s;
-        }
-
-            .password-toggle:hover {
-                color: #667eea;
-            }
-
-        .btn-login {
-            width: 100%;
-            padding: 1rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-        }
-
-            .btn-login:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-            }
-
-            .btn-login:active {
-                transform: translateY(0);
-            }
-
-            .btn-login.loading {
-                opacity: 0.7;
-                pointer-events: none;
-            }
-
-        .login-footer {
-            padding: 1.5rem 2rem;
-            background: #f9fafb;
-            border-top: 1px solid #e5e7eb;
-            text-align: center;
-        }
-
-        .last-login {
-            font-size: 0.875rem;
-            color: #6b7280;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-            .last-login i {
-                color: #667eea;
-            }
-
-            .last-login span {
-                font-weight: 600;
-                color: #374151;
-            }
-
-        .security-badge {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            padding: 0.75rem;
-            background: #f0fdf4;
-            border: 1px solid #86efac;
-            border-radius: 10px;
-            margin-bottom: 1.5rem;
-            font-size: 0.875rem;
-            color: #166534;
-        }
-
-            .security-badge i {
-                color: #10b981;
-                font-size: 1.125rem;
-            }
-
-        @@media (max-width: 480px) {
-            .login-header
-
-        {
-            padding: 2rem 1.5rem;
-        }
-
-        .login-body {
-            padding: 2rem 1.5rem;
-        }
-
-        .login-title {
-            font-size: 1.5rem;
-        }
-
-        }
-
-        /* Loading animation */
-        @@keyframes spin {
-            to
-
-        {
-            transform: rotate(360deg);
-        }
-
-        }
-
-        .btn-login.loading::after {
-            content: '';
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-        }
-    </style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/css/auth.css" asp-append-version="true">
 </head>
-<body>
-    <div class="login-container">
-        <div class="login-card">
-            <div class="login-header">
-                <div class="login-logo">
-                    <i class="fas fa-shield-halved"></i>
-                </div>
-                <h1 class="login-title">Admin Portal</h1>
-                <p class="login-subtitle">Sign in to manage your e-commerce platform</p>
-            </div>
-
-            <div class="login-body">
-                <div class="security-badge">
-                    <i class="fas fa-lock"></i>
-                    <span>Secure encrypted connection</span>
-                </div>
+<body class="auth-page">
+    <main class="auth-shell">
+        <section class="auth-card" aria-labelledby="admin-login-title">
+            <div class="auth-panel">
+                <div class="auth-brand">Eduvo Administration</div>
+                <h1 id="admin-login-title">Administrator login</h1>
+                <p>Manage users, sellers, products, and platform status.</p>
 
                 @if (ViewBag.Error != null)
                 {
-                    <div class="alert">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <span>@ViewBag.Error</span>
-                    </div>
+                    <div class="auth-alert error" role="alert" style="display:block">@ViewBag.Error</div>
                 }
 
-                <form asp-action="Login" asp-controller="Admin" method="post" id="loginForm">
-                    <div class="form-group">
-                        <label class="form-label">Username</label>
-                        <div class="input-group">
-                            <i class="fas fa-user input-icon"></i>
-                            <input type="text"
-                                   class="form-control"
-                                   name="AdminUsername"
-                                   placeholder="Enter your username"
-                                   required
-                                   autocomplete="username">
+                <form asp-action="Login" asp-controller="Admin" method="post">
+                    <div class="auth-field">
+                        <label class="auth-label" for="AdminUsername">Username</label>
+                        <input class="auth-input" id="AdminUsername" name="AdminUsername"
+                               autocomplete="username" required>
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-label" for="AdminPassword">Password</label>
+                        <div class="auth-password">
+                            <input class="auth-input" id="AdminPassword" name="AdminPassword"
+                                   type="password" autocomplete="current-password" required>
+                            <button class="auth-password-toggle" type="button"
+                                    data-toggle-password="AdminPassword"
+                                    aria-label="Show password">Show</button>
                         </div>
                     </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <div class="input-group">
-                            <i class="fas fa-lock input-icon"></i>
-                            <input type="password"
-                                   class="form-control"
-                                   id="passwordInput"
-                                   name="AdminPassword"
-                                   placeholder="Enter your password"
-                                   required
-                                   autocomplete="current-password">
-                            <i class="fas fa-eye password-toggle" id="togglePassword"></i>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn-login" id="loginBtn">
-                        <i class="fas fa-sign-in-alt"></i>
-                        <span id="btnText">Sign In</span>
-                    </button>
+                    <button class="auth-button" type="submit">Sign in</button>
                 </form>
+                <div class="auth-footer">Session expires after inactivity.</div>
             </div>
-
-            @if (ViewBag.LastLogin != null)
-            {
-                <div class="login-footer">
-                    <div class="last-login">
-                        <i class="fas fa-clock"></i>
-                        <span>Last login:</span>
-                        <span>@ViewBag.LastLogin</span>
-                    </div>
-                </div>
-            }
-        </div>
-    </div>
-
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+        </section>
+    </main>
     <script>
-        $(document).ready(function() {
-            // Toggle password visibility
-            $('#togglePassword').on('click', function() {
-                const passwordInput = $('#passwordInput');
-                const icon = $(this);
-
-                if (passwordInput.attr('type') === 'password') {
-                    passwordInput.attr('type', 'text');
-                    icon.removeClass('fa-eye').addClass('fa-eye-slash');
-                } else {
-                    passwordInput.attr('type', 'password');
-                    icon.removeClass('fa-eye-slash').addClass('fa-eye');
-                }
-            });
-
-            // Form submit animation
-            $('#loginForm').on('submit', function() {
-                const btn = $('#loginBtn');
-                const btnText = $('#btnText');
-
-                btn.addClass('loading');
-                btnText.text('Signing in...');
+        document.querySelectorAll("[data-toggle-password]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                const input = document.getElementById(button.dataset.togglePassword);
+                const show = input.type === "password";
+                input.type = show ? "text" : "password";
+                button.textContent = show ? "Hide" : "Show";
+                button.setAttribute("aria-label", show ? "Hide password" : "Show password");
             });
         });
     </script>

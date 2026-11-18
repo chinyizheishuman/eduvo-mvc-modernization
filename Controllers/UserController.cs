@@ -1,5 +1,6 @@
 ﻿using JQuery_ECommerceAss.Common.Enum;
 using JQuery_ECommerceAss.Common.Security;
+using JQuery_ECommerceAss.Common.Pricing;
 using JQuery_ECommerceAss.Data;
 using JQuery_ECommerceAss.Models;
 using MailKit.Net.Smtp;
@@ -7,10 +8,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
 using System.Text.Json;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 
 namespace JQuery_ECommerceAss.Controllers
 {
     [AutoValidateAntiforgeryToken]
+    [Authorize(Roles = "Shopper", Policy = "ShopperOnly")]
     public class UserController : Controller
     {
         private readonly AppDbContext db;
@@ -28,6 +34,7 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== LOGIN (AJAX) ====================
+        [AllowAnonymous]
         public IActionResult Login()
         {
             if (IsUserLoggedIn())
@@ -38,7 +45,9 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         [HttpPost]
-        public IActionResult Login(User user)
+        [AllowAnonymous]
+        [HttpPost]
+        public async Task<IActionResult> Login(User user)
         {
             if (string.IsNullOrWhiteSpace(user.Username) || string.IsNullOrWhiteSpace(user.UserPassword))
             {
@@ -112,6 +121,7 @@ namespace JQuery_ECommerceAss.Controllers
 
             HttpContext.Session.SetString("LoginUser", getUser.UserID.ToString());
             HttpContext.Session.SetString("Username", getUser.Username ?? string.Empty);
+            await SignInAsync(getUser);
 
             AutoAssignPromotions(getUser.UserID);
 
@@ -155,6 +165,7 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== REGISTER (AJAX) ====================
+        [AllowAnonymous]
         [HttpPost]
         public IActionResult Register(string Username, string UserGmail, string UserPhoneNum, string UserPassword, string ConfirmPassword)
         {
@@ -222,6 +233,7 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== OTP ====================
+        [AllowAnonymous]
         public IActionResult OTP()
         {
             if (string.IsNullOrEmpty(HttpContext.Session.GetString("OTP")))
@@ -231,6 +243,7 @@ namespace JQuery_ECommerceAss.Controllers
             return View();
         }
 
+        [AllowAnonymous]
         [HttpPost]
         public IActionResult OTP(string otp)
         {
@@ -335,11 +348,13 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== FORGOT PASSWORD (AJAX) ====================
+        [AllowAnonymous]
         public IActionResult ForgotPassword()
         {
             return View();
         }
 
+        [AllowAnonymous]
         [HttpPost]
         public IActionResult ForgotPassword(string email)
         {
@@ -369,6 +384,7 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== CHANGE PASSWORD (AJAX) ====================
+        [AllowAnonymous]
         public IActionResult ChangePassword()
         {
             if (!IsPasswordResetVerified())
@@ -378,6 +394,7 @@ namespace JQuery_ECommerceAss.Controllers
             return View();
         }
 
+        [AllowAnonymous]
         [HttpPost]
         public IActionResult ChangePassword(string newPassword, string ConfirmNewPassword)
         {
@@ -409,9 +426,11 @@ namespace JQuery_ECommerceAss.Controllers
         }
 
         // ==================== LOGOUT ====================
-        public IActionResult Logout()
+        [AllowAnonymous]
+        public async Task<IActionResult> Logout()
         {
             HttpContext.Session.Clear();
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return RedirectToAction(nameof(Login));
         }
 
@@ -658,6 +677,29 @@ namespace JQuery_ECommerceAss.Controllers
                 return RedirectToAction(nameof(Cart));
             }
 
+            using var transactionScope = db.Database.BeginTransaction(
+                System.Data.IsolationLevel.Serializable);
+
+            var existingAttempt = db.CheckoutAttempts
+                .FirstOrDefault(attempt =>
+                    attempt.RequestId == checkoutToken &&
+                    attempt.UserID == userId);
+            if (existingAttempt != null)
+            {
+                TempData["Error"] = "This checkout was already submitted.";
+                return RedirectToAction(nameof(Checkout));
+            }
+
+            var checkoutAttempt = new CheckoutAttempt
+            {
+                RequestId = checkoutToken,
+                UserID = userId,
+                DateTime = DateTime.Now,
+                Status = "Pending"
+            };
+            db.CheckoutAttempts.Add(checkoutAttempt);
+            db.SaveChanges();
+
             var products = new List<Product>();
             foreach (var item in cartItems)
             {
@@ -678,8 +720,8 @@ namespace JQuery_ECommerceAss.Controllers
                 products.Add(product);
             }
 
-            var authoritativeSubtotal = cartItems.Sum(c => (c.Price ?? 0) * (c.Quantity ?? 0));
-            var authoritativeGst = authoritativeSubtotal * 0.06m;
+            var authoritativeSubtotal = CheckoutPricing.CalculateSubtotal(cartItems);
+            var authoritativeGst = CheckoutPricing.CalculateGst(authoritativeSubtotal);
             var authoritativePromotion = 0m;
             var userPromotionId = HttpContext.Session.GetInt32("UserPromotionID");
             UserPromotion? userPromotion = null;
@@ -700,11 +742,11 @@ namespace JQuery_ECommerceAss.Controllers
                     (promo.EndDate == null || promo.EndDate >= now) &&
                     (!promo.MinPurchaseAmount.HasValue || authoritativeSubtotal >= promo.MinPurchaseAmount.Value))
                 {
-                    authoritativePromotion = authoritativeSubtotal * (promo.DiscountPercentage / 100);
-                    if (promo.MaxDiscountAmount is > 0 && authoritativePromotion > promo.MaxDiscountAmount.Value)
-                    {
-                        authoritativePromotion = promo.MaxDiscountAmount.Value;
-                    }
+                    authoritativePromotion = CheckoutPricing.CalculatePromotion(
+                        authoritativeSubtotal,
+                        promo,
+                        userPromotion.IsUsed,
+                        now);
                 }
                 else
                 {
@@ -712,7 +754,6 @@ namespace JQuery_ECommerceAss.Controllers
                 }
             }
 
-            using var transactionScope = db.Database.BeginTransaction();
             var sellerGroups = cartItems
                 .Where(c => c.Product?.SellerID != null)
                 .GroupBy(c => c.Product!.SellerID!.Value);
@@ -759,6 +800,7 @@ namespace JQuery_ECommerceAss.Controllers
             }
 
             db.Carts.RemoveRange(cartItems);
+            checkoutAttempt.Status = "Completed";
             db.SaveChanges();
             transactionScope.Commit();
 
@@ -1185,25 +1227,20 @@ namespace JQuery_ECommerceAss.Controllers
                 return RedirectToAction(nameof(Cart));
             }
 
-            decimal subtotal = cartItems.Sum(c => (c.Price ?? 0) * (c.Quantity ?? 0));
+            decimal subtotal = CheckoutPricing.CalculateSubtotal(cartItems);
+            decimal discount = CheckoutPricing.CalculatePromotion(
+                subtotal,
+                promo,
+                userPromotion.IsUsed,
+                DateTime.Now);
 
-            if (promo.MinPurchaseAmount.HasValue && promo.MinPurchaseAmount > 0)
+            if (discount == 0m &&
+                promo.MinPurchaseAmount.HasValue &&
+                promo.MinPurchaseAmount.Value > 0 &&
+                subtotal < promo.MinPurchaseAmount.Value)
             {
-                if (subtotal < promo.MinPurchaseAmount.Value)
-                {
-                    TempData["PromoError"] = $"Minimum purchase of RM {promo.MinPurchaseAmount.Value:0.00} required.";
-                    return RedirectToAction(nameof(Checkout));
-                }
-            }
-
-            decimal discount = subtotal * (promo.DiscountPercentage / 100);
-
-            if (promo.MaxDiscountAmount.HasValue && promo.MaxDiscountAmount > 0)
-            {
-                if (discount > promo.MaxDiscountAmount.Value)
-                {
-                    discount = promo.MaxDiscountAmount.Value;
-                }
+                TempData["PromoError"] = $"Minimum purchase of RM {promo.MinPurchaseAmount.Value:0.00} required.";
+                return RedirectToAction(nameof(Checkout));
             }
 
             HttpContext.Session.SetString("AppliedPromoCode", promo.PromotionCode ?? string.Empty);
@@ -1413,9 +1450,7 @@ namespace JQuery_ECommerceAss.Controllers
                 smtp.Connect(
                     GetRequiredConfiguration("Smtp:Host"),
                     GetRequiredPort("Smtp:Port"));
-                smtp.Authenticate(
-                    GetRequiredConfiguration("Smtp:Username"),
-                    GetRequiredConfiguration("Smtp:Password"));
+                AuthenticateIfConfigured(smtp);
                 smtp.Send(new SmtpSendRequest(message), CancellationToken.None);
                 smtp.Disconnect(true);
             }
@@ -1431,6 +1466,27 @@ namespace JQuery_ECommerceAss.Controllers
         {
             var userId = HttpContext.Session.GetString("LoginUser");
             return !string.IsNullOrEmpty(userId);
+        }
+
+        private async Task SignInAsync(User user)
+        {
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
+                new Claim(ClaimTypes.Name, user.Username ?? string.Empty),
+                new Claim(ClaimTypes.Role, "Shopper")
+            };
+            var principal = new ClaimsPrincipal(
+                new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal,
+                new AuthenticationProperties
+                {
+                    IsPersistent = false,
+                    AllowRefresh = true
+                });
         }
 
         private bool IsPasswordResetVerified()
@@ -1459,9 +1515,7 @@ namespace JQuery_ECommerceAss.Controllers
             smtp.Connect(
                 GetRequiredConfiguration("Smtp:Host"),
                 GetRequiredPort("Smtp:Port"));
-            smtp.Authenticate(
-                GetRequiredConfiguration("Smtp:Username"),
-                GetRequiredConfiguration("Smtp:Password"));
+            AuthenticateIfConfigured(smtp);
             smtp.Send(new SmtpSendRequest(message), CancellationToken.None);
             smtp.Disconnect(true);
         }
@@ -1479,6 +1533,17 @@ namespace JQuery_ECommerceAss.Controllers
             return int.TryParse(GetRequiredConfiguration(key), out var port)
                 ? port
                 : throw new InvalidOperationException($"Invalid SMTP port configuration: {key}");
+        }
+
+        private void AuthenticateIfConfigured(SmtpClient smtp)
+        {
+            var username = _configuration["Smtp:Username"];
+            var password = _configuration["Smtp:Password"];
+
+            if (!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password))
+            {
+                smtp.Authenticate(username, password);
+            }
         }
 
         private string GenerateOTP()
