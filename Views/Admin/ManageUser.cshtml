@@ -534,6 +534,9 @@
                     } else {
                         showAlert('danger', response.message);
                     }
+                },
+                error: function() {
+                    showAlert('danger', 'Unable to update the user status.');
                 }
             });
         }
@@ -554,6 +557,9 @@
                     } else {
                         showAlert('danger', response.message);
                     }
+                },
+                error: function() {
+                    showAlert('danger', 'Unable to delete the user.');
                 }
             });
         }

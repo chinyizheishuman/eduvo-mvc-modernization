@@ -731,6 +731,7 @@ namespace JQuery_ECommerceAss.Controllers
                 {
                     var imagesUrls = new List<string>();
                     var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "products");
+                    Directory.CreateDirectory(uploadsFolder);
 
                     foreach (var image in images)
                     {

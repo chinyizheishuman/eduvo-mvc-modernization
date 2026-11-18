@@ -1,0 +1,75 @@
+@{
+    ViewData["Title"] = "OTP Verification";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/css/auth.css" asp-append-version="true">
+</head>
+<body class="auth-page">
+    <main class="auth-shell">
+        <section class="auth-card" aria-labelledby="otp-title">
+            <div class="auth-panel">
+                <div class="auth-brand">Account verification</div>
+                <h1 id="otp-title">Enter OTP</h1>
+                <p>Enter the six-digit code sent to the registered email.</p>
+                <div class="auth-alert error" id="errorAlert" role="alert"></div>
+                <div class="auth-alert success" id="successAlert" role="status"></div>
+                <form id="otpForm">
+                    @Html.AntiForgeryToken()
+                    <div class="auth-field">
+                        <label class="auth-label" for="otpInput">Six-digit code</label>
+                        <input class="auth-input auth-otp" id="otpInput" name="otp"
+                               inputmode="numeric" maxlength="6" autocomplete="one-time-code" required>
+                    </div>
+                    <button class="auth-button" type="submit">Verify code</button>
+                </form>
+            </div>
+        </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <script>
+        $("#otpInput").on("input", function () {
+            this.value = this.value.replace(/[^0-9]/g, "");
+        }).trigger("focus");
+
+        $("#otpForm").on("submit", function (event) {
+            event.preventDefault();
+            const otp = $("#otpInput").val();
+            if (otp.length !== 6) {
+                $("#successAlert").hide();
+                $("#errorAlert").text("Enter the full six-digit code.").show();
+                return;
+            }
+            const button = this.querySelector("button[type=submit]");
+            button.disabled = true;
+            $.ajax({
+                url: window.location.pathname,
+                type: "POST",
+                data: $(this).serialize(),
+                success: function (response) {
+                    if (response.success) {
+                        $("#errorAlert").hide();
+                        $("#successAlert").text("Code verified.").show();
+                        setTimeout(function () {
+                            window.location.href = response.redirect || '@Url.Action("Login", "User")';
+                        }, 500);
+                    } else {
+                        $("#successAlert").hide();
+                        $("#errorAlert").text(response.message || "Invalid OTP.").show();
+                        $("#otpInput").val("").trigger("focus");
+                    }
+                },
+                error: function () {
+                    $("#errorAlert").text("The server could not verify the code.").show();
+                },
+                complete: function () { button.disabled = false; }
+            });
+        });
+    </script>
+</body>
+</html>

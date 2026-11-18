@@ -1,3 +1,4 @@
+@using JQuery_ECommerceAss.Common.Enum
 @{
     ViewData["Title"] = "Seller Management";
     Layout = null;
@@ -182,6 +183,7 @@
                                 <option value="1">Inactive</option>
                                 <option value="2">Pending</option>
                                 <option value="3">Suspended</option>
+                                <option value="@((int)Status.Approve)">Approved</option>
                             </select>
                         </div>
                     </form>
@@ -233,6 +235,7 @@
                                 <option value="1">Inactive</option>
                                 <option value="2">Pending</option>
                                 <option value="3">Suspended</option>
+                                <option value="@((int)Status.Approve)">Approved</option>
                             </select>
                             <small class="form-help">
                                 <i class="fas fa-lightbulb"></i> Changing from Suspended to Active will auto-reset login attempts
@@ -273,26 +276,15 @@
     <partial name="_AntiforgeryHeader" />
 
     <script>
-    $.ajaxSetup({
-        beforeSend: function(xhr, settings) {
-            if (settings.type.toUpperCase() === 'POST') {
-                const token = document.querySelector(
-                    'input[name="__RequestVerificationToken"]'
-                );
+        let allSellers = [];
 
-                if (token) {
-                    xhr.setRequestHeader(
-                        'RequestVerificationToken',
-                        token.value
-                    );
-                }
-            }
+        const activeStatus = @((int)Status.Active);
+        const inactiveStatus = @((int)Status.Inactive);
+        const approvedStatus = @((int)Status.Approve);
+
+        function isSellerEnabled(status) {
+            return status === activeStatus || status === approvedStatus;
         }
-    });
-
-    let allSellers = [];
-
-
         $(document).ready(function() {
             loadSellers();
 
@@ -319,7 +311,8 @@
                 0: { text: 'Active', class: 'badge-success' },
                 1: { text: 'Inactive', class: 'badge-secondary' },
                 2: { text: 'Pending', class: 'badge-warning' },
-                3: { text: 'Suspended', class: 'badge-danger' }
+                3: { text: 'Suspended', class: 'badge-danger' },
+                [approvedStatus]: { text: 'Approved', class: 'badge-success' }
             };
             return statusMap[status] || { text: 'Unknown', class: 'badge-secondary' };
         }
@@ -360,6 +353,7 @@
 
             sellers.forEach(seller => {
                 const statusInfo = getStatusInfo(seller.sellerStatus);
+                const enabled = isSellerEnabled(seller.sellerStatus);
                 const registeredDate = seller.dateTime ? new Date(seller.dateTime).toLocaleDateString() : 'N/A';
                 const loginTryBadge = seller.loginTry >= 3 ? `<span class="badge badge-danger"><i class="fas fa-lock"></i> ${seller.loginTry}</span>` : seller.loginTry || 0;
 
@@ -379,10 +373,10 @@
                                 <button class="btn btn-sm btn-icon btn-secondary" onclick="editSeller(${seller.sellerID})" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-sm btn-icon ${seller.sellerStatus === 0 ? 'btn-danger' : 'btn-success'}"
+                                <button class="btn btn-sm btn-icon ${enabled ? 'btn-danger' : 'btn-success'}"
                                         onclick="toggleStatus(${seller.sellerID}, ${seller.sellerStatus})"
-                                        title="${seller.sellerStatus === 0 ? 'Deactivate' : 'Activate'}">
-                                    <i class="fas fa-${seller.sellerStatus === 0 ? 'ban' : 'check'}"></i>
+                                        title="${enabled ? 'Deactivate' : 'Activate'}">
+                                    <i class="fas fa-${enabled ? 'ban' : 'check'}"></i>
                                 </button>
                                 <button class="btn btn-sm btn-icon btn-danger" onclick="deleteSeller(${seller.sellerID})" title="Delete">
                                     <i class="fas fa-trash"></i>
@@ -519,8 +513,8 @@
         }
 
         function toggleStatus(sellerId, currentStatus) {
-            const newStatus = currentStatus === 0 ? 1 : 0;
-            const action = newStatus === 1 ? 'deactivate' : 'activate';
+            const newStatus = isSellerEnabled(currentStatus) ? inactiveStatus : activeStatus;
+            const action = newStatus === inactiveStatus ? 'deactivate' : 'activate';
 
             if (!confirm(`Are you sure you want to ${action} this seller?`)) {
                 return;
@@ -537,6 +531,9 @@
                     } else {
                         showAlert('danger', response.message);
                     }
+                },
+                error: function() {
+                    showAlert('danger', 'Unable to update the seller status.');
                 }
             });
         }
@@ -557,6 +554,9 @@
                     } else {
                         showAlert('danger', response.message);
                     }
+                },
+                error: function() {
+                    showAlert('danger', 'Unable to delete the seller.');
                 }
             });
         }

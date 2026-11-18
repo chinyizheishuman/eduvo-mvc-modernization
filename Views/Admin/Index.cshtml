@@ -352,7 +352,6 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/js/session-guard.js"></script>
     <partial name="_AntiforgeryHeader" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 
     <script>
         let allProducts = [];
@@ -376,12 +375,9 @@
                 }, 300);
             });
 
-            $('#productImages').on('change', function(e) {
-                handleImagePreview(e.target.files, 'imagePreviewContainer');
-            });
-
-            $('#editProductImages').on('change', function(e) {
-                handleImagePreview(e.target.files, 'editImagePreviewContainer');
+            $('#productImages, #editProductImages').on('change', function() {
+                const container = $(this).next('.image-preview-container');
+                renderImagePreviews(this, container);
             });
 
             $('#saveProductBtn').on('click', saveProduct);
@@ -512,12 +508,11 @@
         }
 
         function saveProduct() {
-            const formData = new FormData($('#createProductForm')[0]);
-            const files = $('#productImages')[0].files;
-
-            for (let i = 0; i < files.length; i++) {
-                formData.append('images', files[i]);
+            const form = $('#createProductForm')[0];
+            if (!form.reportValidity()) {
+                return;
             }
+            const formData = new FormData(form);
 
             $.ajax({
                 url: '@Url.Action("CreateProductAjax", "Admin")',
@@ -572,12 +567,11 @@
         }
 
         function updateProduct() {
-            const formData = new FormData($('#editProductForm')[0]);
-            const files = $('#editProductImages')[0].files;
-
-            for (let i = 0; i < files.length; i++) {
-                formData.append('images', files[i]);
+            const form = $('#editProductForm')[0];
+            if (!form.reportValidity()) {
+                return;
             }
+            const formData = new FormData(form);
 
             $.ajax({
                 url: '@Url.Action("UpdateProductAjax", "Admin")',
@@ -675,9 +669,6 @@
             $.ajax({
                 url: '@Url.Action("UpdateProductStatusAjax", "Admin")',
                 type: 'POST',
-                headers: {
-                 "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').first().val()
-                },
                 data: { id: productId, status: newStatus },
                 success: function(response) {
                     if (response.success) {
@@ -686,6 +677,9 @@
                     } else {
                         showAlert('danger', response.message);
                     }
+                },
+                error: function() {
+                    showAlert('danger', 'Unable to update the product status.');
                 }
             });
         }
@@ -706,30 +700,43 @@
                     } else {
                         showAlert('danger', response.message);
                     }
+                },
+                error: function() {
+                    showAlert('danger', 'Unable to delete the product.');
                 }
             });
         }
 
-        function handleImagePreview(files, containerId) {
-            const container = $(`#${containerId}`);
+        function renderImagePreviews(input, container) {
             container.empty();
 
+            const files = input.files;
             Array.from(files).forEach((file, index) => {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    container.append(`
-                        <div class="image-preview-item" data-index="${index}">
+                    if (input.files !== files) {
+                        return;
+                    }
+                    const preview = $(`
+                        <div class="image-preview-item">
                             <img src="${e.target.result}" alt="Preview">
-                            <button type="button" class="remove-image" onclick="removeImagePreview('${containerId}', ${index})">×</button>
+                            <button type="button" class="remove-image" aria-label="Remove selected image">×</button>
                         </div>
                     `);
+                    preview.find('button').on('click', function() {
+                        const selection = new DataTransfer();
+                        Array.from(input.files).forEach((selectedFile, selectedIndex) => {
+                            if (selectedIndex !== index) {
+                                selection.items.add(selectedFile);
+                            }
+                        });
+                        input.files = selection.files;
+                        renderImagePreviews(input, container);
+                    });
+                    container.append(preview);
                 };
                 reader.readAsDataURL(file);
             });
-        }
-
-        function removeImagePreview(containerId, index) {
-            $(`#${containerId} .image-preview-item[data-index="${index}"]`).remove();
         }
 
         function showAlert(type, message) {
