@@ -18,7 +18,19 @@ The app built, but **Add Product** and **Checkout** both crashed. Fixing those c
 | **Admin** | Filter to pending listings and activate the Demo Laptop so shoppers can see it. [Product management](docs/screenshots/admin-products.png) · [Phone view](docs/screenshots/admin-mobile.png) |
 | **Shopper** | Find the activated listing in the catalogue. To try checkout, add one Steam Deck, apply `DEMO10`, then find the RM 2,399.04 order in order history. [Checkout](docs/screenshots/shopper-checkout.png) · [Phone view](docs/screenshots/shopper-mobile.png) · [Order history](docs/screenshots/shopper-order-history.png) |
 
-## What I learned from the last unit
+## A closer look
+
+| Seller inventory | Admin review |
+|:---:|:---:|
+| ![Seller inventory with product and stock management](docs/screenshots/seller-products.png) | ![Admin product management and review](docs/screenshots/admin-products.png) |
+| Update a listing and its stock. | Review a listing before it goes live. |
+
+| Checkout | On a phone |
+|:---:|:---:|
+| ![Shopper checkout with a demo order](docs/screenshots/shopper-checkout.png) | ![Shopper interface on a narrow screen](docs/screenshots/shopper-mobile.png) |
+| Follow an order through the demo checkout. | Check the layout beyond a desktop screenshot. |
+
+## The bug that taught me the most
 
 My favorite check was two shoppers trying to buy the last unit. In SQL Server, one order went through, the other shopper landed back in the cart, and the listing ended up with zero stock. The recovered checkout read inventory before the transaction started. Moving the read into the transaction and handling the conflict meant the second shopper got a useful response.
 
