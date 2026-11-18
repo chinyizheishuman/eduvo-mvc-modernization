@@ -6,6 +6,8 @@ references, so anyone reading the repo can verify each difference in minutes.
 
 Written 18 November 2026 after a live end-to-end session in a fresh Codespace.
 
+This is a snapshot of the earlier recovery. Use the [verification record](VERIFICATION.md) for current test results and demo guidance.
+
 ## The original module, verified from the 2025 archive
 
 Every line below was read directly from the original DSE207 submission archive.
