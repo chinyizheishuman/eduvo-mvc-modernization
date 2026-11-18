@@ -1,0 +1,776 @@
+﻿:root {
+    --neon-cyan: #00f3ff;
+    --neon-pink: #ff00ff;
+    --neon-purple: #bd00ff;
+    --neon-green: #00ff00;
+    --neon-red: #ff0000;
+    --dark-bg: #0a0a0f;
+    --card-bg: #1a1a2e;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0a0;
+    --table-header: #00d4e0;
+}
+
+/* ============ 全局样式 ============ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0a0a0f 100%);
+    background-attachment: fixed;
+    color: var(--text-primary);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+}
+
+/* ============ neon style text ============ */
+.neon-text {
+    color: var(--table-header);
+    text-shadow: 0 0 5px var(--table-header), 0 0 10px var(--table-header), 0 0 20px var(--table-header);
+    animation: neon-flicker 2s infinite alternate;
+}
+
+@keyframes neon-flicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+        text-shadow: 0 0 5px var(--table-header), 0 0 10px var(--table-header), 0 0 20px var(--table-header);
+    }
+
+    20%, 24%, 55% {
+        text-shadow: none;
+    }
+}
+
+/* ============ card design ============ */
+.cyber-card {
+    background: rgba(26, 26, 46, 0.9);
+    border: 2px solid var(--table-header);
+    border-radius: 15px;
+    box-shadow: 0 0 15px rgba(0, 212, 224, 0.3), inset 0 0 20px rgba(0, 212, 224, 0.05);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+}
+
+    .cyber-card::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: linear-gradient(45deg, var(--table-header), var(--neon-pink), var(--neon-purple));
+        border-radius: 15px;
+        opacity: 0;
+        z-index: -1;
+        transition: opacity 0.3s ease;
+    }
+
+    .cyber-card:hover::before {
+        opacity: 0.3;
+    }
+
+    .cyber-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 25px rgba(0, 212, 224, 0.5), inset 0 0 30px rgba(0, 212, 224, 0.1);
+    }
+
+/* ============ button design ============ */
+.btn-cyber {
+    background: transparent;
+    border: 2px solid var(--table-header);
+    color: var(--table-header);
+    padding: 10px 25px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+    .btn-cyber::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: var(--table-header);
+        transition: left 0.3s ease;
+        z-index: -1;
+    }
+
+    .btn-cyber:hover {
+        color: #000;
+        box-shadow: 0 0 10px var(--table-header), 0 0 20px var(--table-header);
+    }
+
+        .btn-cyber:hover::before {
+            left: 0;
+        }
+
+.btn-cyber-pink {
+    border-color: var(--neon-pink);
+    color: var(--neon-pink);
+}
+
+    .btn-cyber-pink::before {
+        background: var(--neon-pink);
+    }
+
+    .btn-cyber-pink:hover {
+        box-shadow: 0 0 10px var(--neon-pink), 0 0 20px var(--neon-pink);
+    }
+
+.btn-cyber-purple {
+    border-color: var(--neon-purple);
+    color: var(--neon-purple);
+}
+
+    .btn-cyber-purple::before {
+        background: var(--neon-purple);
+    }
+
+.btn-cyber-success {
+    border-color: var(--neon-green);
+    color: var(--neon-green);
+}
+
+    .btn-cyber-success::before {
+        background: var(--neon-green);
+    }
+
+.btn-cyber-danger {
+    border-color: var(--neon-red);
+    color: var(--neon-red);
+}
+
+    .btn-cyber-danger::before {
+        background: var(--neon-red);
+    }
+
+.btn-cyber-sm {
+    padding: 5px 15px;
+    font-size: 0.85rem;
+}
+
+/* ============ input style ============ */
+.cyber-input,
+.form-control.cyber-input,
+.form-select.cyber-input,
+textarea.cyber-input {
+    background: rgba(26, 26, 46, 0.8) !important;
+    border: 2px solid var(--table-header) !important;
+    border-radius: 8px;
+    color: var(--text-primary) !important;
+    padding: 12px 20px;
+    transition: all 0.3s ease;
+}
+
+    .cyber-input:focus,
+    .form-control.cyber-input:focus,
+    .form-select.cyber-input:focus,
+    textarea.cyber-input:focus {
+        background: rgba(26, 26, 46, 0.95) !important;
+        border-color: var(--neon-pink) !important;
+        box-shadow: 0 0 10px rgba(255, 0, 255, 0.5), inset 0 0 10px rgba(255, 0, 255, 0.1) !important;
+        outline: none;
+        color: var(--text-primary) !important;
+    }
+
+    .cyber-input::placeholder {
+        color: var(--text-secondary);
+    }
+
+.form-label {
+    color: var(--table-header);
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+}
+
+/* ============ 统计卡片 ============ */
+.stat-card-cyber {
+    background: rgba(26, 26, 46, 0.9);
+    border: 2px solid var(--table-header);
+    border-radius: 15px;
+    padding: 25px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+    .stat-card-cyber::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 100px;
+        height: 100px;
+        background: radial-gradient(circle, var(--table-header) 0%, transparent 70%);
+        opacity: 0.3;
+        transition: all 0.3s ease;
+    }
+
+    .stat-card-cyber:hover::after {
+        opacity: 0.6;
+        transform: scale(1.5);
+    }
+
+    .stat-card-cyber:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 243, 255, 0.4);
+    }
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--table-header);
+    text-shadow: 0 0 10px var(--table-header);
+}
+
+/* ============ form design ============ */
+.cyber-table {
+    background: rgba(26, 26, 46, 0.8);
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+    .cyber-table table {
+        margin-bottom: 0;
+    }
+
+    .cyber-table thead {
+        background: linear-gradient(135deg, rgba(0, 212, 224, 0.2) 0%, rgba(0, 243, 255, 0.15) 100%);
+        border-bottom: 2px solid var(--table-header);
+    }
+
+        .cyber-table thead th {
+            color: #00d4e0 !important;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 600;
+            padding: 18px 15px;
+            border: none;
+            font-size: 0.9rem;
+            text-shadow: 0 0 8px rgba(0, 212, 224, 0.5) !important;
+            background: linear-gradient(135deg, rgba(0, 212, 224, 0.2) 0%, rgba(0, 243, 255, 0.15) 100%) !important;
+        }
+
+table thead th {
+    color: #00d4e0 !important;
+}
+
+th {
+    color: #00d4e0 !important;
+}
+
+    .cyber-table tbody tr {
+        border-bottom: 1px solid rgba(0, 212, 224, 0.15);
+        transition: all 0.3s ease;
+        background: transparent;
+    }
+
+        .cyber-table tbody tr:hover {
+            background: rgba(0, 212, 224, 0.08);
+            box-shadow: 0 0 15px rgba(0, 212, 224, 0.2);
+            transform: translateX(5px);
+        }
+
+    .cyber-table tbody td {
+        color: var(--text-primary) !important;
+        padding: 15px;
+        border: none;
+        background: transparent;
+        vertical-align: middle;
+    }
+
+/* ============ Modal design ============ */
+.modal-cyber .modal-content {
+    background: rgba(26, 26, 46, 0.98);
+    border: 2px solid var(--table-header);
+    border-radius: 15px;
+    box-shadow: 0 0 30px rgba(0, 212, 224, 0.5), inset 0 0 30px rgba(0, 212, 224, 0.05);
+}
+
+.modal-cyber .modal-header {
+    border-bottom: 2px solid var(--table-header);
+    background: rgba(0, 212, 224, 0.05);
+}
+
+.modal-cyber .modal-title {
+    color: var(--table-header);
+    text-shadow: 0 0 10px var(--table-header);
+}
+
+.modal-cyber .modal-footer {
+    border-top: 2px solid rgba(0, 212, 224, 0.3);
+}
+
+.modal-cyber .btn-close {
+    filter: brightness(0) invert(1);
+    opacity: 0.8;
+}
+
+    .modal-cyber .btn-close:hover {
+        opacity: 1;
+    }
+
+/* ============ Badge design ============ */
+.badge-cyber {
+    background: transparent;
+    border: 2px solid var(--table-header);
+    color: var(--table-header);
+    padding: 5px 15px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.75rem;
+    display: inline-block;
+    font-weight: 600;
+}
+
+.badge-cyber-active {
+    border-color: var(--neon-green);
+    color: var(--neon-green);
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+.badge-cyber-inactive {
+    border-color: var(--neon-red);
+    color: var(--neon-red);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+/* ============ search bar ============ */
+.search-cyber {
+    position: relative;
+}
+
+    .search-cyber input {
+        background: rgba(26, 26, 46, 0.8);
+        border: 2px solid var(--table-header);
+        border-radius: 25px;
+        color: var(--text-primary);
+        padding: 12px 45px 12px 20px;
+        width: 100%;
+    }
+
+    .search-cyber .search-icon {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--table-header);
+        pointer-events: none;
+    }
+
+/* ============ image preview ============ */
+.image-preview-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.image-preview-item {
+    position: relative;
+    border: 2px solid var(--neon-cyan);
+    border-radius: 10px;
+    padding: 5px;
+    background: rgba(26, 26, 46, 0.8);
+    transition: all 0.3s ease;
+}
+
+    .image-preview-item:hover {
+        box-shadow: 0 0 15px var(--neon-cyan);
+        transform: scale(1.05);
+    }
+
+    .image-preview-item img {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 5px;
+        display: block;
+    }
+
+.remove-image {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--neon-red);
+    color: white;
+    border: 2px solid var(--neon-red);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 26px;
+    text-align: center;
+    box-shadow: 0 0 10px var(--neon-red);
+    transition: all 0.3s ease;
+}
+
+    .remove-image:hover {
+        transform: scale(1.2);
+        box-shadow: 0 0 20px var(--neon-red);
+    }
+
+/* ============ Alert design ============ */
+.alert-cyber {
+    background: rgba(26, 26, 46, 0.95);
+    border: 2px solid var(--table-header);
+    border-radius: 10px;
+    color: var(--text-primary);
+    box-shadow: 0 0 15px rgba(0, 212, 224, 0.3);
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.alert-cyber-success {
+    border-color: var(--neon-green);
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+}
+
+.alert-cyber-danger {
+    border-color: var(--neon-red);
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+}
+
+.alert-cyber-warning {
+    border-color: #ffff00;
+    box-shadow: 0 0 15px rgba(255, 255, 0, 0.3);
+}
+
+/* ============ Loading Spinner ============ */
+.cyber-spinner {
+    border: 3px solid rgba(0, 212, 224, 0.2);
+    border-top: 3px solid var(--table-header);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: cyber-spin 1s linear infinite;
+    box-shadow: 0 0 10px var(--table-header);
+}
+
+@keyframes cyber-spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* ============ navigation bar ============ */
+.navbar-cyber {
+    background: rgba(26, 26, 46, 0.95);
+    border-bottom: 2px solid var(--table-header);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 5px 20px rgba(0, 212, 224, 0.3);
+}
+
+    .navbar-cyber .navbar-brand {
+        font-weight: 700;
+        font-size: 1.5rem;
+    }
+
+    .navbar-cyber .nav-link {
+        color: var(--text-primary) !important;
+        transition: all 0.3s ease;
+        position: relative;
+        padding: 10px 15px;
+    }
+
+        .navbar-cyber .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--table-header);
+            transition: width 0.3s ease;
+        }
+
+        .navbar-cyber .nav-link:hover::after {
+            width: 100%;
+        }
+
+        .navbar-cyber .nav-link:hover,
+        .navbar-cyber .nav-link.active {
+            color: var(--table-header) !important;
+            text-shadow: 0 0 10px var(--table-header);
+        }
+
+/* ============ Scrollbar ============ */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--dark-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--table-header);
+    border-radius: 5px;
+    box-shadow: 0 0 10px var(--table-header);
+}
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--neon-pink);
+        box-shadow: 0 0 10px var(--neon-pink);
+    }
+
+/* ============ animation 效果 ============ */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.slide-in {
+    animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* ============ 图片design ============ */
+.product-thumbnail {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border: 2px solid var(--table-header);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+    .product-thumbnail:hover {
+        transform: scale(1.3);
+        box-shadow: 0 0 20px var(--table-header);
+        z-index: 100;
+    }
+
+/* ============ 响应式调整 ============ */
+@media (max-width: 768px) {
+    .stat-value {
+        font-size: 2rem;
+    }
+
+    .stat-card-cyber {
+        margin-bottom: 15px;
+    }
+
+    .btn-cyber {
+        padding: 8px 15px;
+        font-size: 0.85rem;
+    }
+
+    .navbar-cyber .nav-link {
+        padding: 8px 12px;
+    }
+}
+
+/* ============ 工具类 ============ */
+.text-neon-cyan {
+    color: var(--table-header);
+    text-shadow: 0 0 10px var(--table-header);
+}
+
+.text-neon-pink {
+    color: var(--neon-pink);
+    text-shadow: 0 0 10px var(--neon-pink);
+}
+
+.text-neon-purple {
+    color: var(--neon-purple);
+    text-shadow: 0 0 10px var(--neon-purple);
+}
+
+.border-neon-cyan {
+    border: 2px solid var(--table-header);
+}
+
+.border-neon-pink {
+    border: 2px solid var(--neon-pink);
+}
+
+.border-neon-purple {
+    border: 2px solid var(--neon-purple);
+}
+
+/* ============ last login time ============ */
+.navbar-cyber .nav-link[style*="cursor: default"] {
+    pointer-events: none;
+    background: rgba(0, 243, 255, 0.05);
+    border-radius: 5px;
+    padding: 8px 15px;
+    margin: 0 5px;
+}
+
+    .navbar-cyber .nav-link[style*="cursor: default"]:hover {
+        background: rgba(0, 243, 255, 0.05);
+    }
+
+        .navbar-cyber .nav-link[style*="cursor: default"]:hover::after {
+            width: 0;
+        }
+
+/* 响应式: 在小screen 调整last login time display */
+@media (max-width: 991px) {
+    .navbar-cyber .nav-link[style*="cursor: default"] {
+        text-align: left;
+        padding: 10px 15px;
+        margin: 5px 0;
+    }
+}
+
+/* ============ Badge status design（5种） ============ */
+.badge-cyber {
+    background: transparent;
+    border: 2px solid var(--table-header);
+    color: var(--table-header);
+    padding: 5px 15px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.75rem;
+    display: inline-block;
+    font-weight: 600;
+}
+
+/* Active 青色 */
+.badge-cyber-active {
+    border-color: #00d4e0;
+    color: #00d4e0;
+    box-shadow: 0 0 10px rgba(0, 212, 224, 0.5);
+}
+
+/* Inactive 红色 */
+.badge-cyber-inactive {
+    border-color: #ff0000;
+    color: #ff0000;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+/* Pending 黄色 */
+.badge-cyber-pending {
+    border-color: #ffff00;
+    color: #ffff00;
+    box-shadow: 0 0 10px rgba(255, 255, 0, 0.5);
+}
+
+/* Suspended 橙色 */
+.badge-cyber-suspended {
+    border-color: #ff6600;
+    color: #ff6600;
+    box-shadow: 0 0 10px rgba(255, 102, 0, 0.5);
+}
+
+/* Approved 绿色 */
+.badge-cyber-approved {
+    border-color: #00ff00;
+    color: #00ff00;
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+/* ============ 统计卡片可点击effect ============ */
+.stat-card-cyber {
+    background: rgba(26, 26, 46, 0.9);
+    border: 2px solid var(--table-header);
+    border-radius: 15px;
+    padding: 25px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    /* 加可点击effect */
+    cursor: pointer;
+    text-decoration: none;
+    display: block;
+}
+
+    .stat-card-cyber::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 100px;
+        height: 100px;
+        background: radial-gradient(circle, var(--table-header) 0%, transparent 70%);
+        opacity: 0.3;
+        transition: all 0.3s ease;
+    }
+
+    .stat-card-cyber:hover::after {
+        opacity: 0.6;
+        transform: scale(1.5);
+    }
+
+    .stat-card-cyber:hover {
+        transform: translateY(-5px) scale(1.02);
+        box-shadow: 0 10px 30px rgba(0, 243, 255, 0.6);
+    }
+
+    /* click animation */
+    .stat-card-cyber:active {
+        transform: translateY(-3px) scale(0.98);
+    }
+
+/* ============ status filter button ============ */
+.status-filter-btn {
+    background: transparent;
+    border: 2px solid var(--table-header);
+    color: var(--table-header);
+    padding: 8px 20px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin: 5px;
+}
+
+    .status-filter-btn.active {
+        background: var(--table-header);
+        color: #000;
+        box-shadow: 0 0 15px var(--table-header);
+    }
+
+    .status-filter-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0 10px var(--table-header);
+    }

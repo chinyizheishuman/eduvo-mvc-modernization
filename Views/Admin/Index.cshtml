@@ -675,6 +675,9 @@
             $.ajax({
                 url: '@Url.Action("UpdateProductStatusAjax", "Admin")',
                 type: 'POST',
+                headers: {
+                 "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').first().val()
+                },
                 data: { id: productId, status: newStatus },
                 success: function(response) {
                     if (response.success) {

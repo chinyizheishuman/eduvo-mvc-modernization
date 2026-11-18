@@ -273,7 +273,25 @@
     <partial name="_AntiforgeryHeader" />
 
     <script>
-        let allSellers = [];
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (settings.type.toUpperCase() === 'POST') {
+                const token = document.querySelector(
+                    'input[name="__RequestVerificationToken"]'
+                );
+
+                if (token) {
+                    xhr.setRequestHeader(
+                        'RequestVerificationToken',
+                        token.value
+                    );
+                }
+            }
+        }
+    });
+
+    let allSellers = [];
+
 
         $(document).ready(function() {
             loadSellers();
