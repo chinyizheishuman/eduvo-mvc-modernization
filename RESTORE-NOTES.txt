@@ -1,0 +1,44 @@
+EDUVO RESTORE PACK - AdminController + login views
+===================================================
+
+What happened
+  Your codespace tree lost Controllers/AdminController.cs and the login views
+  (Views/User/Login.cshtml, Views/Seller/Login.cshtml). That state got committed
+  (git reported a clean tree), which is why every rebuild still 404s /Admin/Login
+  and 500s /User/Login and /Seller/Login. Program.cs was never the problem.
+
+What is in this pack
+  Controllers/AdminController.cs          (restored, builds clean)
+  Views/Admin/Login.cshtml
+  Views/Admin/Index.cshtml
+  Views/Admin/Dashboard.cshtml
+  Views/Admin/ManageUser.cshtml
+  Views/Admin/ManageSeller.cshtml
+  Views/User/Login.cshtml
+  Views/Seller/Login.cshtml
+  RESTORE-NOTES.txt                       (this file)
+
+  Source = last known-good state; whole project build verified with this exact
+  AdminController: 0 warnings, 0 errors. The stray byte-order mark on line 5 of
+  AdminController.cs was stripped (cosmetic only, no behavior change).
+
+APPLY - from the repo root in the Codespace (/workspaces/eduvo-mvc-modernization)
+  1. Drop this zip into the repo root (drag into the VS Code file explorer).
+  2. unzip -o eduvo-restore-login-views.zip
+  3. dotnet build          -> expect 0 errors
+  4. dotnet test           -> expect the green suite (Eduvo.Tests)
+
+VERIFY THE DEMO
+  bash scripts/start-demo.sh
+  curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5067/Admin/Login    -> 200
+  curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5067/User/Login     -> 200
+  curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5067/Seller/Login   -> 200
+  Log in as demo-admin / Admin123! and click through to the dashboard.
+
+MAKE IT STICK (so a fresh Codespace heals instead of breaking)
+  git add Controllers/AdminController.cs Views/Admin Views/User/Login.cshtml Views/Seller/Login.cshtml
+  git commit -m "Restore AdminController and login views"
+  git push
+
+THEN trashing / recreating the Codespace is safe - a fresh clone heals everything,
+because origin/main will finally contain the files the demo needs.

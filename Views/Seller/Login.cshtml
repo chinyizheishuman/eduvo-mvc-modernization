@@ -1,0 +1,170 @@
+@{
+    ViewData["Title"] = "Seller Login";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/css/auth.css" asp-append-version="true">
+</head>
+<body class="auth-page">
+    <main class="auth-shell">
+        <section class="auth-card auth-card-wide" aria-label="Seller account access">
+            <aside class="auth-aside">
+                <div class="auth-brand">Seller workspace</div>
+                <h1>Seller account</h1>
+                <p>Manage products, inventory, status, and customer insights.</p>
+            </aside>
+            <div class="auth-panel">
+                <div class="auth-tabs" role="tablist">
+                    <button class="auth-tab active" type="button" role="tab"
+                            aria-controls="login-panel" aria-selected="true"
+                            data-auth-tab="login-panel">Sign in</button>
+                    <button class="auth-tab" type="button" role="tab"
+                            aria-controls="register-panel" aria-selected="false"
+                            data-auth-tab="register-panel">Register</button>
+                </div>
+                <div class="auth-alert error" id="errorAlert" role="alert"></div>
+                <div class="auth-alert success" id="successAlert" role="status"></div>
+
+                <div class="auth-tab-panel active" id="login-panel" role="tabpanel">
+                    <form id="loginFormElement">
+                        @Html.AntiForgeryToken()
+                        <div class="auth-field">
+                            <label class="auth-label" for="sellerUsername">Username</label>
+                            <input class="auth-input" id="sellerUsername" name="SellerUsername"
+                                   autocomplete="username" required>
+                        </div>
+                        <div class="auth-field">
+                            <label class="auth-label" for="sellerPassword">Password</label>
+                            <div class="auth-password">
+                                <input class="auth-input" id="sellerPassword" name="SellerPassword"
+                                       type="password" autocomplete="current-password" required>
+                                <button class="auth-password-toggle" type="button"
+                                        data-toggle-password="sellerPassword"
+                                        aria-label="Show password">Show</button>
+                            </div>
+                        </div>
+                        <button class="auth-button" type="submit">Sign in</button>
+                    </form>
+                    <div class="auth-links">
+                        <a class="auth-link" href="@Url.Action("ForgotPassword", "Seller")">Forgot password</a>
+                    </div>
+                </div>
+
+                <div class="auth-tab-panel" id="register-panel" role="tabpanel">
+                    <form id="registerFormElement">
+                        @Html.AntiForgeryToken()
+                        <div class="auth-field">
+                            <label class="auth-label" for="registerSellerUsername">Username</label>
+                            <input class="auth-input" id="registerSellerUsername" name="SellerUsername" required>
+                        </div>
+                        <div class="auth-field">
+                            <label class="auth-label" for="registerSellerEmail">Email</label>
+                            <input class="auth-input" id="registerSellerEmail" name="SellerEmail"
+                                   type="email" autocomplete="email" required>
+                        </div>
+                        <div class="auth-field">
+                            <label class="auth-label" for="registerSellerPassword">Password</label>
+                            <input class="auth-input" id="registerSellerPassword" name="SellerPassword"
+                                   type="password" autocomplete="new-password" required>
+                        </div>
+                        <div class="auth-field">
+                            <label class="auth-label" for="registerSellerConfirm">Confirm password</label>
+                            <input class="auth-input" id="registerSellerConfirm" name="ConfirmPassword"
+                                   type="password" autocomplete="new-password" required>
+                        </div>
+                        <button class="auth-button" type="submit">Create account</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <script>
+        document.querySelectorAll("[data-toggle-password]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                const input = document.getElementById(button.dataset.togglePassword);
+                const show = input.type === "password";
+                input.type = show ? "text" : "password";
+                button.textContent = show ? "Hide" : "Show";
+            });
+        });
+
+        document.querySelectorAll("[data-auth-tab]").forEach(function (tab) {
+            tab.addEventListener("click", function () {
+                document.querySelectorAll("[data-auth-tab]").forEach(function (item) {
+                    item.classList.remove("active");
+                    item.setAttribute("aria-selected", "false");
+                });
+                document.querySelectorAll(".auth-tab-panel").forEach(function (panel) {
+                    panel.classList.remove("active");
+                });
+                tab.classList.add("active");
+                tab.setAttribute("aria-selected", "true");
+                document.getElementById(tab.dataset.authTab).classList.add("active");
+            });
+        });
+
+        function showAlert(type, message) {
+            const alert = document.getElementById(type === "success" ? "successAlert" : "errorAlert");
+            document.querySelectorAll(".auth-alert").forEach(function (item) { item.style.display = "none"; });
+            alert.textContent = message;
+            alert.style.display = "block";
+        }
+
+        $("#loginFormElement").on("submit", function (event) {
+            event.preventDefault();
+            const button = this.querySelector("button[type=submit]");
+            button.disabled = true;
+            $.ajax({
+                url: '@Url.Action("Login", "Seller")',
+                type: "POST",
+                data: $(this).serialize(),
+                success: function (response) {
+                    if (response.success) {
+                        showAlert("success", "Sign-in successful. Redirecting.");
+                        setTimeout(function () { window.location.href = '@Url.Action("Dashboard", "Seller")'; }, 600);
+                    } else {
+                        showAlert("error", response.message || "Sign-in failed.");
+                    }
+                },
+                error: function () { showAlert("error", "The server could not process the sign-in."); },
+                complete: function () { button.disabled = false; }
+            });
+        });
+
+        $("#registerFormElement").on("submit", function (event) {
+            event.preventDefault();
+            const values = $(this).serializeArray();
+            const data = {};
+            values.forEach(function (item) { data[item.name] = item.value; });
+            if (data.SellerPassword !== data.ConfirmPassword) {
+                showAlert("error", "Passwords do not match.");
+                return;
+            }
+            const button = this.querySelector("button[type=submit]");
+            button.disabled = true;
+            $.ajax({
+                url: '@Url.Action("Register", "Seller")',
+                type: "POST",
+                data: $(this).serialize(),
+                success: function (response) {
+                    if (response.success) {
+                        showAlert("success", "Account submitted. Check email for the OTP.");
+                        setTimeout(function () { window.location.href = '@Url.Action("OTP", "Seller")'; }, 900);
+                    } else {
+                        showAlert("error", response.message || "Registration failed.");
+                    }
+                },
+                error: function () { showAlert("error", "The server could not process registration."); },
+                complete: function () { button.disabled = false; }
+            });
+        });
+    </script>
+</body>
+</html>
