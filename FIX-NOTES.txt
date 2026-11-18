@@ -1,0 +1,40 @@
+EDUVO FIX OVERLAY v1 - 18 Nov 2026
+Apply from your repo root in Codespace:
+
+  unzip -o eduvo-fix-overlay-v1.zip
+  dotnet build
+  dotnet test
+
+Then restart the demo:  bash scripts/start-demo.sh
+
+WHAT CHANGED (code fixes, all verified with build + tests before packing)
+1. Controllers/UserController.cs + Controllers/SellerController.cs
+   OTP generation now uses RandomNumberGenerator (cryptographically secure)
+   instead of System.Random (predictable). Affects both password-recovery
+   flows. One small method per file, nothing else touched.
+2. wwwroot/js/session-guard.js (NEW FILE)
+   Detects the "Unauthorized" JSON replies that data endpoints return after
+   a session dies, and redirects to the matching login page. This kills the
+   silent frozen dashboard: instead of zeros forever, you get bounced to
+   login and can log back in.
+3. 11 views, one added line each (loads session-guard.js after jQuery):
+   Admin: Dashboard, Index, ManageSeller, ManageUser
+   Seller: Dashboard, CustomerInsights, ChangePassword
+   User: Cart, Products, Index, ChangePassword
+4. README.md
+   Added an "If the demo will not start" troubleshooting list for the
+   common demo failures.
+5. docs/MODERNIZATION-NOTES.md (NEW FILE)
+   What separates this repo from the original DSE207 module, with file and
+   line references, and how to verify every claim. Built for your portfolio
+   and for the recording narration.
+
+VERIFY AFTER APPLYING
+  dotnet build   -> 0 warnings, 0 errors
+  dotnet test    -> 15 passed (Eduvo.Tests)
+  bash scripts/start-demo.sh -> use Forgot Password on any account, the OTP
+  email appears in Mailpit at port 8025 within seconds.
+
+NOTE
+Your Codespace already has the 30-minute session fix from the full zip you
+applied earlier today. This overlay does not touch Program.cs.

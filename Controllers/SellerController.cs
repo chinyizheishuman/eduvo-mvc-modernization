@@ -1046,8 +1046,8 @@ namespace JQuery_ECommerceAss.Controllers
 
         private string GenerateOTP()
         {
-            Random random = new Random();
-            return random.Next(100000, 999999).ToString();
+            // Cryptographically secure OTP: System.Random is predictable and must never gate password resets.
+            return System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 999999).ToString();
         }
     }
 }

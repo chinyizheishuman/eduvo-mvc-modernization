@@ -161,6 +161,17 @@ The exact SQL Server and Mailpit container commands live in the script itself, s
 
 This is a disposable local environment, not a deployment.
 
+If the demo will not start, these cover almost every case:
+
+- `dotnet: command not found`: the .NET 8 SDK is missing. Install it, then rerun the script.
+- Docker errors about the daemon: Docker is not running. Start it first, then rerun.
+- `Address already in use` on port 5067: a previous run is still alive. Press Ctrl+C in that terminal, then rerun.
+- Containers fail to bind 1433 or 8025: leftovers from an earlier run. Remove them with `docker ps` and `docker rm`, then rerun.
+- Pages load but look unstyled and buttons do nothing: a public CDN is being blocked. The administrator and seller pages load Bootstrap and jQuery from public CDNs, so a filtered network breaks them even though the application is fine.
+- Everything stops responding after a long idle: the login session expired by design. Log in again.
+
+The first run is also slower than later runs because NuGet restores packages.
+
 The complete start-to-finish screen-recording walkthrough, including a manual alternative that runs every piece by hand, lives in [`docs/demo-recording-script.md`](docs/demo-recording-script.md).
 
 ## What's still wrong with it?
