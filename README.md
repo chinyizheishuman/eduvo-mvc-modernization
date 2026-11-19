@@ -18,6 +18,17 @@ The app built, but **Add Product** and **Checkout** both crashed. Fixing those c
 | **Admin** | Filter to pending listings and activate the Demo Laptop so shoppers can see it. [Product management](docs/screenshots/admin-products.png) · [Phone view](docs/screenshots/admin-mobile.png) |
 | **Shopper** | Find the activated listing in the catalogue. To try checkout, add one Steam Deck, apply `DEMO10`, then find the RM 2,399.04 order in order history. [Checkout](docs/screenshots/shopper-checkout.png) · [Phone view](docs/screenshots/shopper-mobile.png) · [Order history](docs/screenshots/shopper-order-history.png) |
 
+## One listing, three roles
+
+```mermaid
+flowchart LR
+    S["Seller updates a listing"] --> A["Admin reviews and activates"]
+    A --> C["Shopper sees it in the catalogue"]
+    C --> O["Cart, checkout, order history"]
+```
+
+The walkthrough uses a Demo Laptop for the listing workflow and a Steam Deck for checkout. [Follow the actual controllers, views and pricing code](docs/PROJECT-MAP.md).
+
 ## A closer look
 
 | Seller inventory | Admin review |
@@ -33,6 +44,8 @@ The app built, but **Add Product** and **Checkout** both crashed. Fixing those c
 ## The bug that taught me the most
 
 My favorite check was two shoppers trying to buy the last unit. In SQL Server, one order went through, the other shopper landed back in the cart, and the listing ended up with zero stock. The recovered checkout read inventory before the transaction started. Moving the read into the transaction and handling the conflict meant the second shopper got a useful response.
+
+I also documented repairs to antiforgery handling, password storage, output encoding and product-image paths, alongside the gaps that still need work. [Defensive review and evidence](docs/VERIFICATION.md#follow-up-repairs-and-defensive-review).
 
 The current suite passes **29 automated tests**. The MVC integration tests use EF Core’s in-memory provider and verify that a changed price, quantity, or promotion requires another review. A separate Chromium run against SQL Server confirmed that a seller’s stock edit reaches the catalogue after Admin activation and that checkout records the discounted total. [Verification notes and known limits](docs/VERIFICATION.md)
 
