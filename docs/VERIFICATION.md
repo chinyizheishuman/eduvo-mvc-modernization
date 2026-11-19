@@ -1,4 +1,29 @@
-# Eduvo MVC verification
+# Geek Lab | Verification record
+
+This is a dated record of **what was checked**, not a blanket security certification. The source is public, but the app checks below used **private, local/loopback demo environments**.
+
+## Evidence at a glance
+
+| Evidence | Scope | Important boundary |
+| --- | --- | --- |
+| **29 current xUnit cases** | Counted from `[Fact]` and `[Theory]` / `[InlineData]` in the four files under `Eduvo.Tests`; the most recent recorded run reported 29 passed | A source count is not a fresh test execution. HTTP integration tests replace SQL Server with EF Core InMemory. |
+| **SQL Server + Chromium** | Earlier sessions exercised Seller stock edits, Admin activation, Shopper catalogue, promotion and order history | These checks ran against the demo state described below, not necessarily the newest checkout build. |
+| **Last-unit SQL Server scenario** | Two shoppers competed for one unit: one order completed, the other returned to cart; final stock zero | A recorded focused scenario, not a sustained concurrency/load test. |
+| **GitHub Actions** | [Build workflow](../.github/workflows/build.yml) restores, builds and tests the .NET projects on push and PR | Presence of the workflow does not attest that the latest run succeeded. |
+| **Visual evidence** | Seven actual desktop/phone PNGs in [screenshots](screenshots) | Screenshots show specific runs; they don't prove untouched workflows or security properties. |
+
+### Why other test counts appear below
+
+**15 → 19 → 23 → 24 → 29** refers to successive test-suite checkpoints during the 18–19 November restoration. The **29-case suite** is the current documented checkpoint, not the sum of these numbers. Older entries remain below so the chronology and their specific browser evidence are not lost.
+
+For a fresh result, run:
+
+```bash
+dotnet test Eduvo.Tests/Eduvo.Tests.csproj
+```
+
+Do not label that command successful until it has actually completed in your environment.
+
 
 ## Checkout and repository review
 
@@ -65,7 +90,7 @@ The source review found EF Core LINQ queries throughout the reviewed request pat
 
 ### Remaining work
 
-- This is a private demo. Review HTTPS and cookie deployment settings, distributed session and key storage, and database access before considering any public service.
+- The published repository contains a local-only demo, not a public service. Review HTTPS and cookie deployment settings, distributed session and key storage, and database access before considering any public service.
 - Verification code limits are per challenge in the current session. Durable rate limiting, stricter account recovery controls, upload decoding and scanning, and dependency pinning remain open.
 - Several unlinked legacy Admin edit, delete, detail, and status routes still reference absent Razor views. The supported Admin flows use the modals and AJAX actions on the management pages. Broad concurrent load and full accessibility remain unverified. The interface review used Chromium at desktop and phone widths with targeted keyboard interaction.
 - NuGet reported no known advisories for the application’s direct or transitive packages from its configured source. Vendored jQuery Validation 1.19.5 is covered by an upstream advisory. The current Razor views have no references to that script, so the version match alone does not establish a reachable issue. [GitHub advisory](https://github.com/advisories/GHSA-rrj2-ph5q-jxw2)

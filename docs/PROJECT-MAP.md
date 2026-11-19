@@ -2,14 +2,27 @@
 
 Geek Lab is a three-role ASP.NET Core MVC shop. Razor renders the pages, jQuery handles selected requests such as cart updates and Admin status changes, and EF Core writes to SQL Server. The demo sends account verification and recovery email to Mailpit.
 
+The demo follows **two related but distinct examples**. A Demo Laptop moves through listing review; a Steam Deck is used to demonstrate checkout. They should not be presented as one uninterrupted purchase.
+
+### Listing lifecycle
+
 ```mermaid
 flowchart LR
-    Seller["Seller edits a pending listing"] --> Admin["Admin activates the listing"]
-    Admin --> Catalogue["Shopper finds it in the catalogue"]
-    Catalogue --> Cart["Cart and promotion"]
-    Cart --> Checkout["Server checks price and stock"]
-    Checkout --> Order["Order history"]
+    S["Seller edits Demo Laptop"] --> P["Pending review"]
+    P --> A["Admin activates listing"]
+    A --> V["Active: visible in catalogue"]
 ```
+
+### Purchase lifecycle
+
+```mermaid
+flowchart LR
+    C["Shopper selects Steam Deck"] --> B["Cart and DEMO10"]
+    B --> T["Server rechecks prices and stock"]
+    T --> O["Demo order and history"]
+```
+
+These diagrams describe the supported walkthrough, not every state transition or every legacy route.
 
 ## Follow the code
 

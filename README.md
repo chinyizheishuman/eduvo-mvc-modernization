@@ -1,73 +1,72 @@
-# Geek Lab · Eduvo E-Commerce
+# Geek Lab | From coursework to a working shop
 
-**Chin Yi Zhe · Eduvo Academy · DSE207 coursework, 2025**
+**Chin Yi Zhe · DSE207, Eduvo Academy · Built in 2025, revisited in 2026**
 
-I built this shop for class in 2025 and came back to it in 2026 while looking for an internship. By then I could have generated a fresh portfolio project in an afternoon. I wanted to get better at fixing the one I already had. Geek Lab is the shop name. Yeezy Labs was the inside joke.
+I built Geek Lab for class in 2025. When I came back to the project while looking for an internship, it compiled, but parts of the shop didn't actually work. **Add Product** and **Checkout** were two of the first clicks to fail.
 
-The app built, but **Add Product** and **Checkout** both crashed. Fixing those clicks meant finding the missing pages, following the requests through the controllers, and testing them with a real database.
+I didn't want another fresh demo with no history. I wanted to understand what had broken, recover the missing pieces, and test the repairs. Geek Lab is the storefront's original name. Yeezy Labs is where I put the engineering work.
 
-![Geek Lab catalogue with search, stock counts and quantity controls](docs/screenshots/shopper-catalogue.png)
+[![Geek Lab shopper catalogue, captured from the running application](docs/screenshots/shopper-catalogue.png)](docs/screenshots/shopper-catalogue.png)
 
-*Captured in Chromium from the running ASP.NET Core MVC app with a disposable SQL Server database and sample listings.*
+*Actual Chromium capture of a disposable ASP.NET Core MVC + SQL Server demo, not a design mockup.*
 
-## See the app in action
+## The shop, in four screens
 
-| Who | What to try |
-| --- | --- |
-| **Seller** | Edit the stock on the pending Demo Laptop listing and see the saved quantity. [Seller inventory](docs/screenshots/seller-products.png) |
-| **Admin** | Filter to pending listings and activate the Demo Laptop so shoppers can see it. [Product management](docs/screenshots/admin-products.png) · [Phone view](docs/screenshots/admin-mobile.png) |
-| **Shopper** | Find the activated listing in the catalogue. To try checkout, add one Steam Deck, apply `DEMO10`, then find the RM 2,399.04 order in order history. [Checkout](docs/screenshots/shopper-checkout.png) · [Phone view](docs/screenshots/shopper-mobile.png) · [Order history](docs/screenshots/shopper-order-history.png) |
-
-## One listing, three roles
-
-```mermaid
-flowchart LR
-    S["Seller updates a listing"] --> A["Admin reviews and activates"]
-    A --> C["Shopper sees it in the catalogue"]
-    C --> O["Cart, checkout, order history"]
-```
-
-The walkthrough uses a Demo Laptop for the listing workflow and a Steam Deck for checkout. [Follow the actual controllers, views and pricing code](docs/PROJECT-MAP.md).
-
-## A closer look
-
-| Seller inventory | Admin review |
+| Seller: manage inventory | Admin: review listings |
 |:---:|:---:|
-| ![Seller inventory with product and stock management](docs/screenshots/seller-products.png) | ![Admin product management and review](docs/screenshots/admin-products.png) |
-| Update a listing and its stock. | Review a listing before it goes live. |
+| [![Seller inventory](docs/screenshots/seller-products.png)](docs/screenshots/seller-products.png) | [![Admin listing management](docs/screenshots/admin-products.png)](docs/screenshots/admin-products.png) |
+| Change stock on a pending listing. | Activate the listing before shoppers see it. |
 
-| Checkout | On a phone |
+| Shopper: checkout | Small-screen layout |
 |:---:|:---:|
-| ![Shopper checkout with a demo order](docs/screenshots/shopper-checkout.png) | ![Shopper interface on a narrow screen](docs/screenshots/shopper-mobile.png) |
-| Follow an order through the demo checkout. | Check the layout beyond a desktop screenshot. |
+| [![Shopper checkout](docs/screenshots/shopper-checkout.png)](docs/screenshots/shopper-checkout.png) | [![Shopper on a phone-sized screen](docs/screenshots/shopper-mobile.png)](docs/screenshots/shopper-mobile.png) |
+| Review a demo order and promotion. | See how the checkout fits a narrow viewport. |
 
-## The bug that taught me the most
+**The listing journey:** Seller edits **Demo Laptop (Pending)** → Admin activates it (**Active**) → Shopper finds it in the catalogue. The **Steam Deck checkout** is a separate demo flow, not the same item.
 
-My favorite check was two shoppers trying to buy the last unit. In SQL Server, one order went through, the other shopper landed back in the cart, and the listing ended up with zero stock. The recovered checkout read inventory before the transaction started. Moving the read into the transaction and handling the conflict meant the second shopper got a useful response.
+[Admin phone view](docs/screenshots/admin-mobile.png) · [Recorded order history](docs/screenshots/shopper-order-history.png) · [Routes and source map](docs/PROJECT-MAP.md)
 
-I also documented repairs to antiforgery handling, password storage, output encoding and product-image paths, alongside the gaps that still need work. [Defensive review and evidence](docs/VERIFICATION.md#follow-up-repairs-and-defensive-review).
+## The bug worth talking about
 
-The current suite passes **29 automated tests**. The MVC integration tests use EF Core’s in-memory provider and verify that a changed price, quantity, or promotion requires another review. A separate Chromium run against SQL Server confirmed that a seller’s stock edit reaches the catalogue after Admin activation and that checkout records the discounted total. [Verification notes and known limits](docs/VERIFICATION.md)
+Two shoppers tried to purchase the last unit. In the recorded SQL Server check, one order succeeded, the other shopper returned to the cart, and stock finished at zero.
 
-## Run it yourself
+The earlier checkout loaded inventory before its transaction began. The repair reads and checks stock inside a serializable transaction, handles conflicts, and protects against duplicate order submission. This is the kind of bug a successful build cannot catch on its own.
 
-With Docker, Bash, Python 3, curl, a .NET SDK that can target .NET 8, and the .NET 8 runtime, clone the repo and run this from its root:
+That work sits alongside fixes for **missing Razor views**, **antiforgery headers on AJAX updates**, **password storage**, **output encoding**, and **product-image handling**. The [verification record](docs/VERIFICATION.md) distinguishes tested behavior from code review and remaining risks; it is not a claim that every route is production-ready.
+
+## What was actually tested
+
+**29 xUnit test cases** are present in the current test sources; the latest recorded run reported **29 passed**. The HTTP integration tests use EF Core's **in-memory provider**, not SQL Server. Separate browser sessions exercised the demo against SQL Server, including listing approval, stock edits, promotions and order history. A **two-shopper/last-unit SQL Server check** was also recorded.
+
+The newest checkout-review changes have automated test evidence, but were **not all rerun in the browser against the newest build**. Earlier checkpoints reported 15, 19, 23 and 24 tests; those are historical counts, not additional suites. [See exactly what was verified](docs/VERIFICATION.md#evidence-at-a-glance).
+
+CI is configured in [GitHub Actions](.github/workflows/build.yml) to restore, build and run the .NET test project. A workflow file is not, by itself, proof of a passing CI run.
+
+## Run the demo
+
+From the repository root, with Docker, Bash, Python 3, curl and a .NET SDK/runtime capable of running .NET 8:
 
 ```bash
 ./scripts/start-demo.sh
 ```
 
-That's the original one-command idea. It starts SQL Server and Mailpit, applies migrations, seeds the shop, and starts the app. Use the sample accounts from the launcher and keep forwarded Codespace ports private. The [demo guide](docs/DEMO.md) covers the browser walkthrough and running beside an existing demo.
+It starts disposable, loopback-bound SQL Server and Mailpit services, applies migrations, seeds sample accounts and launches the MVC app. **Keep forwarded Codespace ports private.** Don't run the launcher over an existing `eduvo-sql` container: it refuses to reuse that SQL instance.
 
-To check a running demo or test your own changes:
+To check an already running demo and run the automated suite:
 
 ```bash
 ./scripts/check-demo.sh
 dotnet test Eduvo.Tests/Eduvo.Tests.csproj
 ```
 
-## Code and project direction
+The [demo guide](docs/DEMO.md) covers ports, sign-ins, screenshots, and an optional **silent screen recording**. There is no finished video in this repository yet.
 
-The [project map](docs/PROJECT-MAP.md) follows a listing from Seller inventory to Admin review and Shopper checkout, with links to the Razor views, controller actions, and pricing code. It also maps where I could take the project next, including listing history and clearer feedback when price or stock changes.
+## What this project is — and isn't
 
-This is a coursework demo. It uses an in-process session, some assets come from CDNs, and uploads are checked by size and signature. [Known limits](docs/VERIFICATION.md#remaining-work)
+**Stack:** C#, ASP.NET Core MVC, Razor, jQuery, Entity Framework Core, SQL Server, xUnit, GitHub Actions. The local email sink is Mailpit.
+
+This is a recovered **coursework application**, not a payment service or a publicly hosted shop. Its demo checkout does not collect money. In-process session storage, remaining legacy routes, browser dependencies and deployment security still need work before it could be treated as a public service.
+
+[Engineering changes from the original submission](docs/MODERNIZATION-NOTES.md) · [Known limits](docs/VERIFICATION.md#remaining-work) · [Project map](docs/PROJECT-MAP.md)
+
+*Build it. Test the fix. Show the evidence.*

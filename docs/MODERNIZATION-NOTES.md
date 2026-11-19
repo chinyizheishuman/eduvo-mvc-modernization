@@ -1,12 +1,10 @@
-# Modernization notes: what separates this from the original DSE207 module
+# Geek Lab | What changed since the DSE207 submission
 
 This document exists so the claims are checkable. The README tells the story in
 my voice. This file holds the engineering specifics with file and line
 references, so anyone reading the repo can verify each difference in minutes.
 
-Written 18 November 2026 after a live end-to-end session in a fresh Codespace.
-
-This is a snapshot of the earlier recovery. Use the [verification record](VERIFICATION.md) for current test results and demo guidance.
+Originally written on 18 November 2026 from a comparison with the user's 2025 submission archive. **This is a historical comparison**, not a complete current audit. The original archive is not included in this public repository, so readers cannot independently follow the original-file line references without that archive. For current runtime checks and limitations, see the [verification record](VERIFICATION.md).
 
 ## The original module, verified from the 2025 archive
 
@@ -50,8 +48,7 @@ Each item points at where to look.
 4. Upload validation. `Common/Security/FileUploadSecurity.cs` checks file
    type and size before an image is stored. Covered by
    `Eduvo.Tests/FileUploadSecurityTests.cs`.
-5. Antiforgery everywhere. `[AutoValidateAntiforgeryToken]` sits at class
-   level on the Admin, Seller and User controllers.
+5. Antiforgery on state-changing controller requests. `[AutoValidateAntiforgeryToken]` is applied at class level to the Admin, Seller and User controllers. JavaScript requests that mutate state must send the rendered token; this was repaired on the supported management screens. This does not establish that every legacy endpoint is fully audited.
 6. Role-based entry points. `[Authorize(Roles = ...)]` guards the User area,
    with cookie authentication sliding for 30 minutes.
 7. Session lifetime aligned with the cookie. `Program.cs` now sets the
@@ -65,9 +62,7 @@ Each item points at where to look.
    session dies and redirects to the matching login page instead of leaving a
    dashboard frozen at zero. It is wired into the 11 pages that poll
    session-gated data with AJAX.
-10. Automated tests and CI. `Eduvo.Tests` (15 focused tests covering password
-    hashing, checkout pricing, upload validation and an integration smoke
-    pass) plus the GitHub Actions workflow in `.github/workflows/build.yml`.
+10. Automated tests and CI. The original modernization checkpoint contained 15 tests. The current test project has **29 cases** across password hashing, checkout pricing, upload handling and HTTP integration scenarios. The workflow in `.github/workflows/build.yml` runs the .NET suite in CI, but a successful workflow run should be checked separately.
 11. A disposable demo stack. `scripts/start-demo.sh` boots SQL Server 2022
     and Mailpit containers bound to 127.0.0.1, generates a temporary SQL
     password, applies migrations, seeds demo accounts, and tears everything
@@ -78,14 +73,14 @@ Each item points at where to look.
 
 ## What was done on 18 November 2026
 
-A live session in a fresh Codespace confirmed the whole stack runs: admin,
+An earlier live session in a Codespace recorded these checks: admin,
 seller and shopper flows all respond, the dashboard fills from real database
 data, and Mailpit captures mail. During that session:
 
 1. The session and cookie lifetime alignment was confirmed present and working.
 2. OTP generation was moved to `RandomNumberGenerator` in both controllers.
 3. `session-guard.js` was added and wired into the 11 AJAX pages.
-4. The README gained a troubleshooting list for the common demo failures.
+4. Startup, occupied-port and recording instructions were consolidated into [the demo guide](DEMO.md).
 
 ## How to verify the claims
 
@@ -93,7 +88,7 @@ From the repository root:
 
 ```bash
 dotnet build                                    # expect 0 warnings, 0 errors
-dotnet test                                     # expect 15 passed
+dotnet test Eduvo.Tests/Eduvo.Tests.csproj    # current source: 29 cases; inspect actual run result
 grep -n "System.Random" Controllers/*.cs        # expect no matches
 grep -rn "AutoValidateAntiforgeryToken" Controllers/ | head
 ```
@@ -106,7 +101,6 @@ cited above.
 Session-backed authorization still exists in recovered workflows; a full move
 to ASP.NET Core Identity is future work. Mailpit is a demo tool, not an email
 provider. Demo passwords are deliberately simple because the environment is
-disposable. The SMTP fields still present in `appsettings.json` should be
-rotated and kept empty before the repository ever becomes public. The session
+disposable. The SMTP username and password fields in the current public `appsettings.json` are empty; the example host remains configured. Keep real credentials in local secrets or environment variables, never in a public commit. The session
 store is in-process, so horizontal scaling would need a distributed cache.
 The application is not production-ready, and none of this pretends otherwise.
