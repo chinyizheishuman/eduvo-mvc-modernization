@@ -36,7 +36,7 @@ The launcher also reserves the container names `eduvo-sql` and `eduvo-mailpit`. 
 | --- | --- | --- |
 | 0:00–0:15 | Seller inventory edit | "An old coursework app. Restored and tested." |
 | 0:15–0:30 | Admin activates the pending Demo Laptop | "Pending → Active" |
-| 0:30–0:50 | Shopper catalogue, Steam Deck cart and promotion | "Two roles, one visible state change; checkout is a separate demo." |
+| 0:30–0:50 | Shopper catalogue, Steam Deck cart and promotion | "Three roles, one listing state change; checkout is a separate demo." |
 | 0:50–1:10 | Test terminal and order history | "Tests and real database checks, with documented limits." |
 
 Record **actual footage**, not fabricated test output; skip or revise any shot that fails. The longer 2:30 storyboard below gives room for an interview walkthrough. A completed recording has **not** yet been published.
