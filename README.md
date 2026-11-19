@@ -61,7 +61,7 @@ dotnet test Eduvo.Tests/Eduvo.Tests.csproj
 
 The [demo guide](docs/DEMO.md) covers ports, sign-ins, screenshots, and an optional **silent screen recording**. There is no finished video in this repository yet.
 
-## What this project is — and isn't
+## Scope and limitations
 
 **Stack:** C#, ASP.NET Core MVC, Razor, jQuery, Entity Framework Core, SQL Server, xUnit, GitHub Actions. The local email sink is Mailpit.
 
